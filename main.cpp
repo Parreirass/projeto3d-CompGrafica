@@ -731,6 +731,67 @@ void drawGoal(unsigned int shaderProgram, unsigned int cubeVAO, unsigned int cyl
 
     glBindVertexArray(0); // Unbind VAO after drawing everything for this goal
 }
+
+void drawGrandstands(unsigned int shaderProgram, unsigned int cubeVAO) {
+    glm::vec4 concreteColor(0.5f, 0.5f, 0.5f, 1.0f); // Cor de concreto
+    
+    int numSteps = 4;           // Número de "degraus" da arquibancada
+    float stepWidth = 1.0f;     // Largura (em X) de cada degrau
+    float stepHeight = 0.5f;    // Altura (em Y) de cada degrau
+    
+    // Dimensões do campo (para posicionamento)
+    float fieldWidth = 24.0f;   // Total em X
+    float fieldLength = 25.0f;  // Total em Z
+    
+    // Metade da largura do campo (onde a linha lateral está)
+    float fieldEdgeX = fieldWidth / 2.0f; 
+    // Fundo do campo (onde a linha de fundo está, atrás do gol)
+    float fieldBackZ = -fieldLength / 2.0f; 
+
+    // --- Arquibancadas Laterais (X negativo e positivo) ---
+    // O comprimento (em Z) das arquibancadas laterais é o mesmo do campo
+    float lateralStepLength = fieldLength;
+    glm::vec3 lateralStepSize(stepWidth, stepHeight, lateralStepLength);
+
+    // Arquibancada Esquerda (X negativo)
+    for (int i = 0; i < numSteps; ++i) {
+        float xPos = -fieldEdgeX - (stepWidth / 2.0f) - (i * stepWidth);
+        float yPos = (stepHeight / 2.0f) + (i * stepHeight);
+        
+        glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(xPos, yPos, 0.0f));
+        model = glm::scale(model, lateralStepSize);
+        drawCube(shaderProgram, model, concreteColor);
+    }
+
+    // Arquibancada Direita (X positivo)
+    for (int i = 0; i < numSteps; ++i) {
+        float xPos = fieldEdgeX + (stepWidth / 2.0f) + (i * stepWidth);
+        float yPos = (stepHeight / 2.0f) + (i * stepHeight);
+        
+        glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(xPos, yPos, 0.0f));
+        model = glm::scale(model, lateralStepSize);
+        drawCube(shaderProgram, model, concreteColor);
+    }
+
+    // --- (NOVO) Arquibancada Traseira (Z negativo, atrás do gol) ---
+    // O comprimento (em X) da arquibancada traseira deve cobrir a largura do campo + as laterais da arquibancada
+    float backStepLengthX = fieldWidth - 8 + (numSteps * stepWidth * 2.0f); // Largura do campo + larguras das arquibancadas laterais
+    float backStepLengthZ = stepWidth; // A "largura" de cada degrau em Z
+
+    glm::vec3 backStepSize(backStepLengthX, stepHeight, backStepLengthZ);
+
+    for (int i = 0; i < numSteps; ++i) {
+        float xPos = 0.0f; // Centralizada em X
+        float yPos = (stepHeight / 2.0f) + (i * stepHeight);
+        // Posição Z: atrás da linha de fundo do campo, e cada degrau mais para trás
+        float zPos = fieldBackZ - (backStepLengthZ / 2.0f) - (i * backStepLengthZ); 
+        
+        glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(xPos, yPos, zPos));
+        model = glm::scale(model, backStepSize);
+        drawCube(shaderProgram, model, concreteColor);
+    }
+}
+
 void drawScoreboard(unsigned int shaderProgram, unsigned int cubeVAO) {
     glm::vec3 scorePos(3.5f, 3.5f, -10.0f);
     float cubeSize = 0.4f; float spacing = 0.5f;
@@ -1033,6 +1094,13 @@ int main() {
         drawField(shaderProgram, cubeVAO);
         drawFieldMarkings(shaderProgram, cubeVAO);
         drawScoreboard(shaderProgram, cubeVAO);
+
+        // glBindVertexArray(cubeVAO);
+        // drawField(shaderProgram, cubeVAO);
+        // drawFieldMarkings(shaderProgram, cubeVAO);
+        // drawScoreboard(shaderProgram, cubeVAO);
+        
+        drawGrandstands(shaderProgram, cubeVAO); // <-- ADICIONE AQUI
         
         // Goleiro (Amarelo, com animação de mergulho)
         drawKeeper(shaderProgram, cubeVAO, sphereVAO, sphereIndexCount, g_keeperPosition, g_keeperColor);

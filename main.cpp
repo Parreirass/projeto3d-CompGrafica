@@ -42,7 +42,7 @@ std::vector<int> g_team2Results = {0, 0, 0};
 glm::vec3 g_playerStartPos(2.0f, 1.1f, 8.0f);
 glm::vec3 g_playerPosition(g_playerStartPos);
 glm::vec3 g_ballPosition(0.0f, 0.1f, 6.0f);
-glm::vec3 g_keeperPosition(0.0f, 1.0f, -10.0f);
+glm::vec3 g_keeperPosition(0.0f, 0.8f, -10.0f);
 
 const glm::vec3 g_playerTorsoSize(0.5f, 0.7f, 0.3f);
 const glm::vec3 g_playerLimbSize(0.15f, 0.5f, 0.15f);
@@ -55,19 +55,11 @@ const float g_goalWidth = 4.0f;
 const float g_goalHeight = 2.0f;
 const glm::vec3 g_goalPostSize(0.2f, 2.0f, 0.2f); // Ainda usado para colisões, pode ser removido se colisão for com cilindro
 
-const glm::vec4 g_team1Stripe1 = glm::vec4(0.1f, 0.1f, 0.1f, 1.0f); // Preto
-const glm::vec4 g_team1Stripe2 = glm::vec4(0.9f, 0.9f, 0.9f, 1.0f); // Branco
-const glm::vec4 g_team1Shorts = glm::vec4(0.1f, 0.1f, 0.1f, 1.0f);  // Shorts Pretos
-
-const glm::vec4 g_team2Color = glm::vec4(0.0f, 0.2f, 0.8f, 1.0f);   // Azul
-const glm::vec4 g_team2Shorts = glm::vec4(0.9f, 0.9f, 0.9f, 1.0f);  // Shorts Brancos
-
-const float g_keeperJointRadius = 0.08f;
-const glm::vec3 g_keeperFootSize = glm::vec3(0.18f, 0.12f, 0.3f);
-const glm::vec3 g_keeperHandSize = glm::vec3(0.15f, 0.15f, 0.15f);
-const float g_playerJointRadius = 0.08f; // Novo: Raio para as esferas das articulações
-const glm::vec3 g_playerFootSize = glm::vec3(0.18f, 0.12f, 0.3f); // Pés arredondados e mais largos
-const glm::vec3 g_playerHandSize = glm::vec3(0.15f, 0.15f, 0.15f); // Mãos como pequenas esferas/cubos arredondados
+// --- NOVOS: parâmetros do gol / rede ---
+const float g_goalLineZ = -10.0f;
+const float g_netDepth = 1.5f;
+const float g_backNetZ = g_goalLineZ - g_netDepth;
+bool g_goalRecorded = false;
 
 // --- Física, IA e Animação ---
 glm::vec3 g_ballVelocity(0.0f);
@@ -85,7 +77,22 @@ std::default_random_engine g_randomEngine(std::chrono::system_clock::now().time_
 std::uniform_int_distribution<int> g_keeperChoice(1, 3);
 
 glm::vec3 g_lightPos(0.0f, 5.0f, 5.0f);
-glm::vec3 g_cameraPos(-11.0f, 6.0f, 15.0f); // X=8 (Direita), Y=6 (Alto), Z=10 (Um pouco mais perto)
+//glm::vec3 g_cameraPos(-11.0f, 6.0f, 17.0f); // X=8 (Direita), Y=6 (Alto), Z=10 (Um pouco mais perto)
+// Ponto que a câmera sempre orbitará (a origem, no seu caso)
+glm::vec3 g_cameraTarget = glm::vec3(0.0f, 1.0f, 0.0f); // 1m acima da origem
+
+// Variáveis da câmera orbital (coordenadas esféricas)
+float g_cameraRadius = 20.0f; // Distância (Zoom). Começa com 20.0f
+float g_cameraYaw = glm::radians(45.0f);   // Rotação horizontal
+float g_cameraPitch = glm::radians(20.0f); // Rotação vertical
+
+// Variáveis dinâmicas (serão calculadas a cada frame)
+glm::vec3 g_cameraPos;  // Posição da câmera (calculada)
+glm::mat4 g_viewMatrix; // Matriz view (calculada)
+
+// Variáveis para controle do mouse
+bool g_isMouseDragging = false;
+double g_lastMouseX, g_lastMouseY;
 
 // --- SHADERS (Iluminação) ---
 const char* lightingVertexShader = "#version 330 core\n"
@@ -119,6 +126,85 @@ const char* lightingFragmentShader = "#version 330 core\n"
     "   vec3 result = (ambient + diffuse + specular) * objectColor.rgb;\n"
     "   FragColor = vec4(result, objectColor.a);\n"
     "}\n\0";
+
+/**
+ * (NOVA) Calcula g_cameraPos e g_viewMatrix com base nos ângulos
+ */
+void updateCamera() {
+    // 1. Trava o ângulo vertical (pitch) para não virar de cabeça para baixo
+    g_cameraPitch = glm::clamp(g_cameraPitch, glm::radians(5.0f), glm::radians(89.0f));
+
+    // 2. Calcula a nova posição 3D da câmera
+    g_cameraPos.x = g_cameraTarget.x + g_cameraRadius * cos(g_cameraPitch) * cos(g_cameraYaw);
+    g_cameraPos.y = g_cameraTarget.y + g_cameraRadius * sin(g_cameraPitch);
+    g_cameraPos.z = g_cameraTarget.z + g_cameraRadius * cos(g_cameraPitch) * sin(g_cameraYaw);
+
+    // 3. Recalcula a View Matrix (como você fazia, mas com as vars dinâmicas)
+    g_viewMatrix = glm::lookAt(g_cameraPos, g_cameraTarget, glm::vec3(0.0f, 1.0f, 0.0f));
+}
+
+/**
+ * (NOVA) Processa input do teclado (setinhas)
+ */
+void processInput(GLFWwindow* window) {
+    float cameraSpeed = 0.03f; // Sensibilidade da rotação
+
+    // Rotaciona para Esquerda
+    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+        g_cameraYaw -= cameraSpeed;
+    // Rotaciona para Direita
+    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+        g_cameraYaw += cameraSpeed;
+    // Rotaciona para Cima
+    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+        g_cameraPitch += cameraSpeed;
+    // Rotaciona para Baixo
+    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+        g_cameraPitch -= cameraSpeed;
+}
+
+/**
+ * (NOVA) Callback para o clique do mouse
+ */
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
+    if (button == GLFW_MOUSE_BUTTON_LEFT) {
+        if (action == GLFW_PRESS) {
+            g_isMouseDragging = true;
+            glfwGetCursorPos(window, &g_lastMouseX, &g_lastMouseY);
+        } else if (action == GLFW_RELEASE) {
+            g_isMouseDragging = false;
+        }
+    }
+}
+
+/**
+ * (NOVA) Callback para a posição do mouse (arrastar)
+ */
+void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
+    if (!g_isMouseDragging) return;
+
+    float xOffset = xpos - g_lastMouseX;
+    float yOffset = g_lastMouseY - ypos; // Invertido
+
+    g_lastMouseX = xpos;
+    g_lastMouseY = ypos;
+
+    float sensitivity = 0.005f;
+    xOffset *= sensitivity;
+    yOffset *= sensitivity;
+
+    g_cameraYaw += xOffset;
+    g_cameraPitch += yOffset;
+}
+
+/**
+ * (NOVA) Callback para o scroll do mouse (zoom)
+ */
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+    float zoomSpeed = 0.5f;
+    g_cameraRadius -= yoffset * zoomSpeed;
+    g_cameraRadius = glm::clamp(g_cameraRadius, 3.0f, 25.0f); // Limita o zoom
+}
 
 // --- GEOMETRIA ---
 float cubeVerticesNormals[] = { -0.5f,-0.5f,-0.5f, 0.0f, 0.0f,-1.0f, 0.5f,-0.5f,-0.5f, 0.0f, 0.0f,-1.0f, 0.5f, 0.5f,-0.5f, 0.0f, 0.0f,-1.0f, 0.5f, 0.5f,-0.5f, 0.0f, 0.0f,-1.0f,-0.5f, 0.5f,-0.5f, 0.0f, 0.0f,-1.0f,-0.5f,-0.5f,-0.5f, 0.0f, 0.0f,-1.0f,-0.5f,-0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.5f,-0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f,-0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f,-0.5f,-0.5f, 0.5f, 0.0f, 0.0f, 1.0f,-0.5f, 0.5f, 0.5f,-1.0f, 0.0f, 0.0f,-0.5f, 0.5f,-0.5f,-1.0f, 0.0f, 0.0f,-0.5f,-0.5f,-0.5f,-1.0f, 0.0f, 0.0f,-0.5f,-0.5f,-0.5f,-1.0f, 0.0f, 0.0f,-0.5f,-0.5f, 0.5f,-1.0f, 0.0f, 0.0f,-0.5f, 0.5f, 0.5f,-1.0f, 0.0f, 0.0f, 0.5f, 0.5f, 0.5f, 1.0f, 0.0f, 0.0f, 0.5f, 0.5f,-0.5f, 1.0f, 0.0f, 0.0f, 0.5f,-0.5f,-0.5f, 1.0f, 0.0f, 0.0f, 0.5f,-0.5f,-0.5f, 1.0f, 0.0f, 0.0f, 0.5f,-0.5f, 0.5f, 1.0f, 0.0f, 0.0f, 0.5f, 0.5f, 0.5f, 1.0f, 0.0f, 0.0f,-0.5f,-0.5f,-0.5f, 0.0f,-1.0f, 0.0f, 0.5f,-0.5f,-0.5f, 0.0f,-1.0f, 0.0f, 0.5f,-0.5f, 0.5f, 0.0f,-1.0f, 0.0f, 0.5f,-0.5f, 0.5f, 0.0f,-1.0f, 0.0f,-0.5f,-0.5f, 0.5f, 0.0f,-1.0f, 0.0f,-0.5f,-0.5f,-0.5f, 0.0f,-1.0f, 0.0f,-0.5f, 0.5f,-0.5f, 0.0f, 1.0f, 0.0f, 0.5f, 0.5f,-0.5f, 0.0f, 1.0f, 0.0f, 0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f, 0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f,-0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f,-0.5f, 0.5f,-0.5f, 0.0f, 1.0f, 0.0f };
@@ -363,7 +449,7 @@ void drawCylinder(unsigned int shaderProgram, unsigned int cylinderVAO, int inde
 //     // Braço Esquerdo
 //     glm::mat4 bracoEsqModel_base = glm::translate(baseTransform, glm::vec3(-shoulderSize.x/2.0f, shoulderAttachY, 0.0f));
 //     bracoEsqModel_base = glm::rotate(bracoEsqModel_base, glm::radians(30.0f) * runAngle, glm::vec3(1.0f, 0.0f, 0.0f));
-//     drawSphere(shaderProgram, sphereVAO, sphereIndexCount, glm::scale(bracoEsqModel_base, glm::vec3(jointRadius)), armColor); // Ombro
+//     drawSphere(shaderProgram, sphereVAO, sphereIndexCount, glm::scale(bracoEsqModel_base, glm::vec3(jointRadius)), armColor; // Ombro
 //     glm::mat4 bracoEsqModel_final = glm::scale(glm::translate(bracoEsqModel_base, glm::vec3(-limbSize.x/2.0f, -limbSize.y/2.0f, 0.0f)), limbSize);
 //     drawCube(shaderProgram, bracoEsqModel_final, armColor); // Braço
     
@@ -374,7 +460,7 @@ void drawCylinder(unsigned int shaderProgram, unsigned int cylinderVAO, int inde
 //     // Braço Direito
 //     glm::mat4 bracoDirModel_base = glm::translate(baseTransform, glm::vec3(shoulderSize.x/2.0f, shoulderAttachY, 0.0f));
 //     bracoDirModel_base = glm::rotate(bracoDirModel_base, glm::radians(30.0f) * -runAngle, glm::vec3(1.0f, 0.0f, 0.0f));
-//     drawSphere(shaderProgram, sphereVAO, sphereIndexCount, glm::scale(bracoDirModel_base, glm::vec3(jointRadius)), armColor); // Ombro
+//     drawSphere(shaderProgram, sphereVAO, sphereIndexCount, glm::scale(bracoDirModel_base, glm::vec3(jointRadius)), armColor; // Ombro
 //     glm::mat4 bracoDirModel_final = glm::scale(glm::translate(bracoDirModel_base, glm::vec3(limbSize.x/2.0f, -limbSize.y/2.0f, 0.0f)), limbSize);
 //     drawCube(shaderProgram, bracoDirModel_final, armColor); // Braço
     
@@ -422,7 +508,7 @@ void drawPlayer(unsigned int shaderProgram, unsigned int cubeVAO, unsigned int s
     canelaEsqModel_base = glm::rotate(canelaEsqModel_base, glm::radians(20.0f) * std::max(0.0f, -runAngle), glm::vec3(1.0f, 0.0f, 0.0f));
     glm::mat4 canelaEsqModel_final = glm::scale(glm::translate(canelaEsqModel_base, glm::vec3(0.0f, -limbSize.y/2.0f, 0.0f)), limbSize);
     drawCube(shaderProgram, canelaEsqModel_final, g_shortsColor);
-    glm::mat4 peEsqModel_base = glm::translate(canelaEsqModel_base, glm::vec3(0.0f, -limbSize.y, 0.0f));
+    glm::mat4 peEsqModel_base = glm::translate(canelaEsqModel_base, glm::vec3(0.0f, -limbSize.y, 0.0f)); // Ponto do tornozelo
     glm::mat4 peEsqModel_final = glm::scale(glm::translate(peEsqModel_base, glm::vec3(0.0f, -footSize.y / 2.0f, footSize.z / 3.0f)), footSize);
     drawCube(shaderProgram, peEsqModel_final, glm::vec4(0.9f, 0.9f, 0.9f, 1.0f)); // Chuteira Branca
     glm::mat4 coxaDirModel_base = glm::translate(baseTransform, glm::vec3(0.15f, -torsoSize.y/2.0f, 0.0f));
@@ -507,7 +593,7 @@ void drawKeeper(unsigned int shaderProgram, unsigned int cubeVAO, unsigned int s
     drawCube(shaderProgram, leftArmModel_final, color);
     glm::mat4 maoEsqModel_base = glm::translate(leftArmModel_base, glm::vec3(-limbSize.x/2.0f, -limbSize.y, 0.0f));
     glm::mat4 maoEsqModel_final = glm::scale(glm::translate(maoEsqModel_base, glm::vec3(0.0f, -handSize.y/2.0f, 0.0f)), handSize);
-    drawCube(shaderProgram, maoEsqModel_final, g_gloveColor); // Usa g_gloveColor
+    drawCube(shaderProgram, maoEsqModel_final, g_skinColor);
     glm::mat4 rightArmModel_base = glm::translate(baseTransform, shoulderR);
     rightArmModel_base = glm::rotate(rightArmModel_base, armRotationX, glm::vec3(1.0f, 0.0f, 0.0f));
     rightArmModel_base = glm::rotate(rightArmModel_base, armRotationY, glm::vec3(0.0f, 1.0f, 0.0f)); // Rotação Y APLICADA
@@ -516,108 +602,8 @@ void drawKeeper(unsigned int shaderProgram, unsigned int cubeVAO, unsigned int s
     drawCube(shaderProgram, rightArmModel_final, color);
     glm::mat4 maoDirModel_base = glm::translate(rightArmModel_base, glm::vec3(limbSize.x/2.0f, -limbSize.y, 0.0f));
     glm::mat4 maoDirModel_final = glm::scale(glm::translate(maoDirModel_base, glm::vec3(0.0f, -handSize.y/2.0f, 0.0f)), handSize);
-    drawCube(shaderProgram, maoDirModel_final, g_gloveColor); // Usa g_gloveColor
+    drawCube(shaderProgram, maoDirModel_final, g_skinColor);
 }
-
-// void drawKeeper(unsigned int shaderProgram, unsigned int cubeVAO, unsigned int sphereVAO, int sphereIndexCount, glm::vec3 position, glm::vec4 color) {
-//     // --- Transformação Base e Animação ---
-//     glm::mat4 baseTransform = glm::translate(glm::mat4(1.0f), glm::vec3(position.x, g_keeperPosition.y, position.z));
-//     float diveRotationZ = 0.0f; float armRotationX = 0.0f; float armRotationY = 0.0f; float jumpY = 0.0f; bool stayMiddle = false;
-//     if (g_keeperState == KEEPER_DIVING) {
-//         float totalDist = abs(g_keeperTargetPos.x - g_keeperPosition.x); float diveProgress = 0.0f;
-//         if (totalDist > 0.01f) { diveProgress = 1.0f - (abs(position.x - g_keeperTargetPos.x) / totalDist); diveProgress = std::min(1.0f, std::max(0.0f, diveProgress)); }
-//         else { stayMiddle = true; float timeSinceDiveStart = g_animationTimer; diveProgress = std::min(1.0f, timeSinceDiveStart / 0.3f); }
-//         if (std::isnan(diveProgress) || std::isinf(diveProgress)) diveProgress = 0.0f;
-//         if (!stayMiddle) {
-//             jumpY = sin(diveProgress * PI) * 0.4f;
-//             diveRotationZ = glm::mix(0.0f, glm::radians(g_keeperTargetPos.x > g_keeperPosition.x ? -80.0f : 80.0f), diveProgress);
-//             armRotationY = glm::mix(0.0f, glm::radians(g_keeperTargetPos.x > g_keeperPosition.x ? -90.0f : 90.0f), diveProgress);
-//         } else {
-//             armRotationX = glm::mix(0.0f, glm::radians(-90.0f), sin(diveProgress * PI));
-//         }
-//     }
-//     baseTransform = glm::translate(baseTransform, glm::vec3(0.0f, jumpY, 0.0f));
-//     baseTransform = glm::rotate(baseTransform, diveRotationZ, glm::vec3(0.0f, 0.0f, 1.0f));
-
-//     // --- Definição de Tamanhos ---
-//     glm::vec3 torsoSize = g_keeperTorsoSize;
-//     glm::vec3 limbSize = g_keeperLimbSize;
-//     float headRadius = g_keeperHeadRadius;
-//     float jointRadius = g_keeperJointRadius;
-//     glm::vec3 handSize = g_keeperHandSize;
-//     glm::vec3 footSize = g_keeperFootSize;
-
-//     // (3) Torso Cônico (Sólido)
-//     glm::vec3 shoulderSize = glm::vec3(torsoSize.x, torsoSize.y * 0.6f, torsoSize.z);
-//     glm::vec3 waistSize = glm::vec3(torsoSize.x * 0.7f, torsoSize.y * 0.4f, torsoSize.z * 0.9f);
-//     float shoulderY = torsoSize.y * 0.4f / 2.0f;
-//     float waistY = -torsoSize.y * 0.6f / 2.0f;
-//     glm::vec3 shoulderPos = glm::vec3(0.0f, shoulderY, 0.0f);
-//     glm::vec3 waistPos = glm::vec3(0.0f, waistY, 0.0f);
-//     float topOfTorso = shoulderY + shoulderSize.y / 2.0f;
-//     float bottomOfTorso = waistY - waistSize.y / 2.0f;
-//     float shoulderAttachY = topOfTorso * 0.8f;
-
-//     // --- Desenhar Torso ---
-//     glBindVertexArray(cubeVAO);
-//     drawCube(shaderProgram, glm::scale(glm::translate(baseTransform, shoulderPos), shoulderSize), color);
-//     drawCube(shaderProgram, glm::scale(glm::translate(baseTransform, waistPos), waistSize), color);
-    
-//     // --- Cabeça e Pescoço ---
-//     glm::mat4 neckJointModel = glm::translate(baseTransform, glm::vec3(0.0f, topOfTorso, 0.0f));
-//     drawSphere(shaderProgram, sphereVAO, sphereIndexCount, glm::scale(neckJointModel, glm::vec3(jointRadius * 1.5f)), g_skinColor);
-//     glm::mat4 headModel = glm::scale(glm::translate(neckJointModel, glm::vec3(0.0f, jointRadius * 1.5f + headRadius * 0.8f, 0.0f)), glm::vec3(headRadius));
-//     drawSphere(shaderProgram, sphereVAO, sphereIndexCount, headModel, g_skinColor);
-    
-//     // --- (1) Pernas (Goleiro - simplificado, sem joelho) ---
-//     glm::vec3 legSize = glm::vec3(limbSize.x, limbSize.y * 1.5f, limbSize.z); // Perna mais longa
-//     glm::vec4 keeperPantsColor = g_team1Stripe1; // Calça preta (exemplo)
-
-//     // Perna Esquerda
-//     glm::mat4 leftLegModel_base = glm::translate(baseTransform, glm::vec3(-waistSize.x/2.5f, bottomOfTorso, 0.0f));
-//     drawSphere(shaderProgram, sphereVAO, sphereIndexCount, glm::scale(leftLegModel_base, glm::vec3(jointRadius)), keeperPantsColor); // Quadril
-//     glm::mat4 leftLegModel_final = glm::scale(glm::translate(leftLegModel_base, glm::vec3(0.0f, -legSize.y/2.0f, 0.0f)), legSize);
-//     drawCube(shaderProgram, leftLegModel_final, keeperPantsColor); // Perna
-    
-//     glm::mat4 peEsqModel_base = glm::translate(leftLegModel_base, glm::vec3(0.0f, -legSize.y, 0.0f)); // Tornozelo
-//     glm::mat4 peEsqModel_final = glm::scale(glm::translate(peEsqModel_base, glm::vec3(0.0f, -footSize.y / 2.0f, footSize.z / 3.0f)), footSize);
-//     drawCube(shaderProgram, peEsqModel_final, g_team1Stripe1); // Chuteira
-
-//     // Perna Direita
-//     glm::mat4 rightLegModel_base = glm::translate(baseTransform, glm::vec3(waistSize.x/2.5f, bottomOfTorso, 0.0f));
-//     drawSphere(shaderProgram, sphereVAO, sphereIndexCount, glm::scale(rightLegModel_base, glm::vec3(jointRadius)), keeperPantsColor); // Quadril
-//     glm::mat4 rightLegModel_final = glm::scale(glm::translate(rightLegModel_base, glm::vec3(0.0f, -legSize.y/2.0f, 0.0f)), legSize);
-//     drawCube(shaderProgram, rightLegModel_final, keeperPantsColor); // Perna
-    
-//     glm::mat4 peDirModel_base = glm::translate(rightLegModel_base, glm::vec3(0.0f, -legSize.y, 0.0f)); // Tornozelo
-//     glm::mat4 peDirModel_final = glm::scale(glm::translate(peDirModel_base, glm::vec3(0.0f, -footSize.y / 2.0f, footSize.z / 3.0f)), footSize);
-//     drawCube(shaderProgram, peDirModel_final, g_team1Stripe1); // Chuteira
-
-//     // --- Braços (com animação de defesa) ---
-//     // Ombro Esquerdo
-//     glm::mat4 leftArmModel_base = glm::translate(baseTransform, glm::vec3(-shoulderSize.x/2.0f, shoulderAttachY, 0.0f));
-//     leftArmModel_base = glm::rotate(leftArmModel_base, armRotationX, glm::vec3(1.0f, 0.0f, 0.0f));
-//     leftArmModel_base = glm::rotate(leftArmModel_base, armRotationY, glm::vec3(0.0f, 1.0f, 0.0f));
-//     drawSphere(shaderProgram, sphereVAO, sphereIndexCount, glm::scale(leftArmModel_base, glm::vec3(jointRadius)), color); // Ombro
-//     glm::mat4 leftArmModel_final = glm::scale(glm::translate(leftArmModel_base, glm::vec3(-limbSize.x/2.0f, -limbSize.y / 2.0f, 0.0f)), limbSize);
-//     drawCube(shaderProgram, leftArmModel_final, color); // Braço
-    
-//     glm::mat4 maoEsqModel_base = glm::translate(leftArmModel_base, glm::vec3(-limbSize.x/2.0f, -limbSize.y, 0.0f));
-//     glm::mat4 maoEsqModel_final = glm::scale(maoEsqModel_base, handSize);
-//     drawSphere(shaderProgram, sphereVAO, sphereIndexCount, maoEsqModel_final, g_gloveColor); // Luva
-
-//     // Ombro Direito
-//     glm::mat4 rightArmModel_base = glm::translate(baseTransform, glm::vec3(shoulderSize.x/2.0f, shoulderAttachY, 0.0f));
-//     rightArmModel_base = glm::rotate(rightArmModel_base, armRotationX, glm::vec3(1.0f, 0.0f, 0.0f));
-//     rightArmModel_base = glm::rotate(rightArmModel_base, armRotationY, glm::vec3(0.0f, 1.0f, 0.0f));
-//     drawSphere(shaderProgram, sphereVAO, sphereIndexCount, glm::scale(rightArmModel_base, glm::vec3(jointRadius)), color); // Ombro
-//     glm::mat4 rightArmModel_final = glm::scale(glm::translate(rightArmModel_base, glm::vec3(limbSize.x/2.0f, -limbSize.y / 2.0f, 0.0f)), limbSize);
-//     drawCube(shaderProgram, rightArmModel_final, color); // Braço
-    
-//     glm::mat4 maoDirModel_base = glm::translate(rightArmModel_base, glm::vec3(limbSize.x/2.0f, -limbSize.y, 0.0f));
-//     glm::mat4 maoDirModel_final = glm::scale(maoDirModel_base, handSize);
-//     drawSphere(shaderProgram, sphereVAO, sphereIndexCount, maoDirModel_final, g_gloveColor); // Luva
-// }
 
 // --- Funções de Cenário ---
 void drawField(unsigned int shaderProgram, unsigned int cubeVAO) {
@@ -651,6 +637,7 @@ void drawGoal(unsigned int shaderProgram, unsigned int cubeVAO, unsigned int cyl
 
     // --- Animation Calculation ---
     float netBackZOffset = 0.0f;
+
     if (g_netAnimationTimer > 0.0f) {
         float bulgeAmount = sin((0.5f - g_netAnimationTimer) / 0.5f * PI);
         netBackZOffset = bulgeAmount * -0.5f;
@@ -763,10 +750,11 @@ void drawScoreboard(unsigned int shaderProgram, unsigned int cubeVAO) {
 
 // --- Colisão e Funções de Texto/Teclado ---
 bool checkCollision(glm::vec3 pos1, glm::vec3 size1, glm::vec3 pos2, float radius2) {
-     glm::vec3 half1 = size1 * 0.5f;
+    glm::vec3 half1 = size1 * 0.5f;
     glm::vec3 closest;
     closest.x = std::max(pos1.x - half1.x, std::min(pos2.x, pos1.x + half1.x));
     closest.y = std::max(pos1.y - half1.y, std::min(pos2.y, pos1.y + half1.y));
+    // FIX: usar pos1.z (antes estava pos1.x erroneamente)
     closest.z = std::max(pos1.z - half1.z, std::min(pos2.z, pos1.z + half1.z));
     float distance = glm::length(closest - pos2);
     return distance < radius2;
@@ -834,6 +822,12 @@ int main() {
     std::pair<unsigned int, int> cylinderData = createCylinderVAO(1.0f, 1.0f, 24);
     unsigned int cylinderVAO = cylinderData.first;
     int cylinderIndexCount = cylinderData.second;
+    glfwSetMouseButtonCallback(window, mouse_button_callback);
+    glfwSetCursorPosCallback(window, cursor_position_callback);
+    glfwSetScrollCallback(window, scroll_callback);
+
+    // Chame isso uma vez antes do loop para definir a posição inicial
+    updateCamera();
     
     printKickMessage();
     float lastFrameTime = 0.0f;
@@ -847,20 +841,20 @@ int main() {
         // --- LÓGICA DE ATUALIZAÇÃO ---
         glfwPollEvents();
         
+        // ... (TODA A SUA LÓGICA DE JOGO VEM AQUI) ...
+        // (if (g_netAnimationTimer > 0.0f)...)
+        // (if (g_gameState != STATE_GAMEOVER)...)
+        // (etc...)
         if (g_netAnimationTimer > 0.0f) { g_netAnimationTimer -= deltaTime; }
-        if (g_gameState == STATE_RUNNING_UP || g_gameState == STATE_KICKING || g_keeperState == KEEPER_DIVING) { // Adiciona KEEPER_DIVING
+        if (g_gameState == STATE_RUNNING_UP || g_gameState == STATE_KICKING || g_keeperState == KEEPER_DIVING) {
             g_animationTimer += deltaTime;
         }
-        
         if (g_gameState != STATE_GAMEOVER) {
-            // 1. INÍCIO DO CHUTE (Pedido)
             if (g_gameState == STATE_READY && g_kickRequest != 0) {
                 g_gameState = STATE_RUNNING_UP;
                 g_animationTimer = 0.0f;
                 std::cout << "Jogador correndo..." << std::endl;
             }
-            
-            // 2. JOGADOR CORRENDO
             if (g_gameState == STATE_RUNNING_UP) {
                 glm::vec2 playerPosXZ(g_playerPosition.x, g_playerPosition.z);
                 glm::vec2 ballPosXZ(g_ballPosition.x, g_ballPosition.z);
@@ -884,46 +878,65 @@ int main() {
                     if (choice == 3) keeperTargetX = (g_goalWidth / 2.0f) * 0.8f;
                     g_keeperTargetPos = glm::vec3(keeperTargetX, g_keeperPosition.y, g_keeperPosition.z);
                     g_keeperState = KEEPER_DIVING;
-                    g_animationTimer = 0.0f; // Reseta timer para animação do goleiro
+                    g_animationTimer = 0.0f; 
                     g_kickRequest = 0;
                 }
             }
-            
-            // 3. ANIMAÇÃO DO CHUTE / BOLA EM VOO
             if (g_gameState == STATE_KICKING) {
                 if (g_animationTimer > 0.3f) {
                     g_gameState = STATE_BALL_IN_FLIGHT; 
                 }
             }
             if (g_gameState == STATE_BALL_IN_FLIGHT) {
+                // Atualiza posição da bola
                 g_ballPosition += g_ballVelocity * deltaTime;
                 int currentKickIndex = g_currentKick / 2;
-                // Usa g_keeperTorsoSize para colisão
-                if (checkCollision(g_keeperPosition, g_keeperTorsoSize, g_ballPosition, g_ballRadius)) {
-                    g_gameState = STATE_SAVED; g_ballVelocity = glm::vec3(0.0f, 0.0f, 2.0f); g_reboundTimer = 0.3f;
+
+                // 1) Colisão com goleiro (prioridade)
+                if (checkCollision(g_keeperPosition, g_keeperTorsoSize, g_ballPosition, g_ballRadius) && !g_goalRecorded) {
+                    // Defesa do goleiro: rebate para frente (em direção ao jogador)
+                    g_gameState = STATE_SAVED;
+                    // Mantém componente X mas reduz, e inverte Z para ir para frente do campo
+                    g_ballVelocity = glm::vec3(g_ballVelocity.x * 0.3f, std::max(0.1f, g_ballVelocity.y * 0.2f), 2.5f);
+                    // Aumenta um pouco o tempo de rebote para a animação ficar visível
+                    g_reboundTimer = 0.8f;
                     std::cout << "DEFENDEU!!!" << std::endl;
                     if (g_currentKicker == TEAM_1) g_team1Results[currentKickIndex] = 2; else g_team2Results[currentKickIndex] = 2;
                     g_currentKick++;
                 }
-                else if (g_ballPosition.z < g_keeperPosition.z) { 
-                    g_gameState = STATE_GOAL; g_netAnimationTimer = 0.5f; g_resetTimer = 2.0f;
-                    if (g_currentKicker == TEAM_1) g_team1Results[currentKickIndex] = 1; else g_team2Results[currentKickIndex] = 1;
-                    std::cout << "GOOOOOOL!!!" << std::endl;
-                    g_currentKick++;
+                else {
+                    // 2) Verifica se cruzou a linha do gol (entrada no arco)
+                    if (!g_goalRecorded && g_ballPosition.z < g_goalLineZ) {
+                        bool insideWidth = std::abs(g_ballPosition.x) <= (g_goalWidth / 2.0f);
+                        bool underCrossbar = g_ballPosition.y <= g_goalHeight;
+                        if (insideWidth && underCrossbar) {
+                            // Marca gol (a bola segue até a rede traseira)
+                            g_goalRecorded = true;
+                            g_gameState = STATE_GOAL; // <-- MUDA O ESTADO
+                            // define tempo para a animação da rede e para manter o estado antes do reset
+                            g_netAnimationTimer = 0.5f;
+                            g_resetTimer = 2.5f; // <-- importante: dá tempo para bola chegar na rede e animação
+                            if (g_currentKicker == TEAM_1) g_team1Results[currentKickIndex] = 1; else g_team2Results[currentKickIndex] = 1;
+                            std::cout << "GOOOOOOL! Bola entrou no gol (registrado)." << std::endl;
+                            g_currentKick++;
+                            // Deixa a velocidade original para que a bola percorra até a rede traseira
+                        } else {
+                            // Passou a linha mas não dentro do arco => bola perdida (fora)
+                            g_gameState = STATE_RESETTING;
+                            g_resetTimer = 2.0f;
+                            std::cout << "Fora do gol." << std::endl;
+                            g_currentKick++;
+                        }
+                    }
+                    // (A LÓGICA DE 'if (g_goalRecorded)' FOI REMOVIDA DAQUI)
                 }
             }
-            
-            // 4. ATUALIZAÇÃO DO GOLEIRO
             if (g_keeperState == KEEPER_DIVING) {
-                 g_keeperPosition.x = glm::mix(g_keeperPosition.x, g_keeperTargetPos.x, g_keeperDiveSpeed * deltaTime);
-                 // Para a animação X quando chega perto
-                 if (glm::distance(g_keeperPosition.x, g_keeperTargetPos.x) < 0.1f) {
-                      g_keeperPosition.x = g_keeperTargetPos.x; // Trava na posição final
-                      // Não reseta o estado ainda, deixa a animação de pulo/braços terminar se necessário
-                 }
+                g_keeperPosition.x = glm::mix(g_keeperPosition.x, g_keeperTargetPos.x, g_keeperDiveSpeed * deltaTime);
+                if (std::abs(g_keeperPosition.x - g_keeperTargetPos.x) < 0.1f) {
+                    g_keeperPosition.x = g_keeperTargetPos.x;
+                }
             }
-            
-            // 5. ESTADO DE REBOTE (SAVED)
             if (g_gameState == STATE_SAVED) {
                 g_reboundTimer -= deltaTime;
                 g_ballPosition += g_ballVelocity * deltaTime;
@@ -931,22 +944,52 @@ int main() {
                     g_gameState = STATE_RESETTING; g_resetTimer = 2.0f; g_ballVelocity = glm::vec3(0.0f);
                 }
             }
-            
             // 6. ESTADO DE GOL
             if (g_gameState == STATE_GOAL) {
-                // Ensure the animation timer starts correctly if it wasn't already set
-                if (g_netAnimationTimer <= 0.0f) { // Check if timer needs starting
-                     g_netAnimationTimer = 0.5f; // Duration of net animation
+                // (NOVO!) ATUALIZA A FÍSICA DA BOLA PARA ELA CONTINUAR ATÉ A REDE
+                g_ballPosition += g_ballVelocity * deltaTime;
+
+                // (MOVIDO PARA CÁ!) VERIFICA COLISÃO COM A REDE TRASEIRA
+                // (A flag g_goalRecorded já é verdadeira se estamos neste estado)
+                if (g_ballPosition.z < (g_backNetZ + 0.05f)) {
+                    // Trava a bola na rede
+                    g_ballPosition.z = g_backNetZ + 0.05f;
+                    
+                    // Rebate (inverte Z e reduz velocidade)
+                    g_ballVelocity.z = 1.0f;
+                    g_ballVelocity.x *= 0.05f;
+                    g_ballVelocity.y = 0.1f; // Pequeno "pop" para cima
+
+                    // Reduz o tempo de reset, pois a bola já parou
+                    g_resetTimer = 2.0f;
                 }
+
+                // (NOVO) VERIFICA SE A BOLA ESTÁ "SAINDO" DO GOL APÓS REBATER
+                // Só ativa se a bola estiver vindo para frente (vel Z > 0)
+                if (g_ballVelocity.z > 0 && g_ballPosition.z > (g_goalLineZ - 0.05f)) {
+                    // Trava a bola na linha do gol
+                    g_ballPosition.z = g_goalLineZ - 0.05f;
+                    // Para a bola completamente
+                    g_ballVelocity = glm::vec3(0.0f);
+                }
+
+                // (Opcional) Mini-gravidade para a bola "cair" no chão após bater
+                if (g_ballPosition.y > g_ballRadius + 0.01f) {
+                    g_ballVelocity.y -= 2.0f * deltaTime; 
+                } else {
+                    g_ballPosition.y = g_ballRadius;
+                    g_ballVelocity.y = 0.0f;
+                }
+
+                // Apenas decrementar timers;
+                if (g_netAnimationTimer > 0.0f) { g_netAnimationTimer -= deltaTime; }
+                if (g_resetTimer > 0.0f) { g_resetTimer -= deltaTime; }
                 
-                g_resetTimer -= deltaTime;
                 if (g_resetTimer <= 0.0f) {
                     g_gameState = STATE_RESETTING;
-                    g_netAnimationTimer = 0.0f; // Ensure timer stops on reset
+                    g_netAnimationTimer = 0.0f;
                 }
             }
-            
-            // 7. REINÍCIO
             if (g_gameState == STATE_RESETTING) {
                 if(g_resetTimer > 0.0f) { g_resetTimer -= deltaTime; }
                 if (g_resetTimer <= 0.0f) {
@@ -956,8 +999,9 @@ int main() {
                         g_gameState = STATE_READY; g_keeperState = KEEPER_IDLE; g_animationTimer = 0.0f;
                         g_currentKicker = (g_currentKicker == TEAM_1) ? TEAM_2 : TEAM_1; 
                         g_playerPosition = g_playerStartPos;
-                        g_ballPosition = glm::vec3(0.0f, 0.1f, 6.0f); // Posição Z corrigida
-                        g_keeperPosition = glm::vec3(0.0f, 0.8f, -10.0f); // Posição Y corrigida
+                        g_ballPosition = glm::vec3(0.0f, 0.1f, 6.0f); 
+                        g_keeperPosition = glm::vec3(0.0f, 0.8f, -10.0f); 
+                        g_goalRecorded = false; 
                         printKickMessage();
                     }
                 }
@@ -969,13 +1013,20 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glUseProgram(shaderProgram);
 
-        // Câmera e Luz
-        glm::mat4 view = glm::lookAt(g_cameraPos, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        // --- Bloco ÚNICO e CORRETO de Câmera ---
+        // 1. Processa os inputs de teclado
+        processInput(window);
+
+        // 2. Atualiza a posição da câmera e a view matrix
+        updateCamera(); 
+
+        // 3. Envia as matrizes e posições atualizadas para o Shader
         glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)WIDTH / (float)HEIGHT, 0.1f, 100.0f);
-        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
+        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, glm::value_ptr(g_viewMatrix)); // Usa a g_viewMatrix
         glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
         glUniform3fv(glGetUniformLocation(shaderProgram, "lightPos"), 1, glm::value_ptr(g_lightPos));
-        glUniform3fv(glGetUniformLocation(shaderProgram, "viewPos"), 1, glm::value_ptr(g_cameraPos));
+        glUniform3fv(glGetUniformLocation(shaderProgram, "viewPos"), 1, glm::value_ptr(g_cameraPos)); // Usa a g_cameraPos
+        // --- Fim do Bloco de Câmera ---
 
         // --- Desenha Objetos OPACOS ---
         glBindVertexArray(cubeVAO);
@@ -1000,7 +1051,6 @@ int main() {
 
         glfwSwapBuffers(window);
     }
-
     // --- LIMPEZA ---
     glDeleteVertexArrays(1, &cubeVAO);
     glDeleteVertexArrays(1, &sphereVAO);

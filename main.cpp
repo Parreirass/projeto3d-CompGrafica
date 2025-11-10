@@ -20,16 +20,16 @@ const int HEIGHT = 600;
 const float PI = 3.14159265359f;
 
 // --- Estados do Jogo ---
-enum GameState { STATE_READY, STATE_RUNNING_UP, STATE_KICKING, STATE_BALL_IN_FLIGHT, STATE_SAVED, STATE_GOAL, STATE_RESETTING, STATE_GAMEOVER };
+enum GameState { STATE_READY, STATE_RUNNING_UP, STATE_KICKING, STATE_BALL_IN_FLIGHT, STATE_SAVED, STATE_GOAL, STATE_RESETTING, STATE_GAMEOVER, STATE_CELEBRATING};
 GameState g_gameState = STATE_READY;
 enum KeeperState { KEEPER_IDLE, KEEPER_DIVING };
 KeeperState g_keeperState = KEEPER_IDLE;
 enum Team { TEAM_1, TEAM_2 };
 Team g_currentKicker = TEAM_1;
 const glm::vec4 g_team1Color1(0.1f, 0.1f, 0.1f, 1.0f); const glm::vec4 g_team1Color2(0.9f, 0.9f, 0.9f, 1.0f);
-const glm::vec4 g_team2Color1(0.0f, 0.2f, 0.8f, 1.0f); const glm::vec4 g_team2Color2(0.9f, 0.9f, 0.9f, 1.0f);
+const glm::vec4 g_team2Color1(0.0f, 0.2f, 0.8f, 1.0f); const glm::vec4 g_team2Color2(0.0f, 0.2f, 0.8f, 1.0f);
 const glm::vec4 g_keeperColor(1.0f, 1.0f, 0.2f, 1.0f);
-const glm::vec4 g_shortsColor(0.1f, 0.1f, 0.4f, 1.0f);
+const glm::vec4 g_shortsColor(0.9f, 0.9f, 0.9f, 1.0f);
 const glm::vec4 g_skinColor(1.0f, 0.8f, 0.6f, 1.0f);
 const glm::vec4 g_gloveColor(0.1f, 0.1f, 0.1f, 1.0f); // NOVO: Cor Preta para Luvas
 
@@ -39,13 +39,13 @@ std::vector<int> g_team1Results = {0, 0, 0};
 std::vector<int> g_team2Results = {0, 0, 0};
 
 // --- Posições e Dimensões ---
-glm::vec3 g_playerStartPos(2.0f, 1.1f, 8.0f);
+glm::vec3 g_playerStartPos(2.0f, 1.5f, 8.0f);
 glm::vec3 g_playerPosition(g_playerStartPos);
 glm::vec3 g_ballPosition(0.0f, 0.1f, 6.0f);
 glm::vec3 g_keeperPosition(0.0f, 0.8f, -10.0f);
 
 const glm::vec3 g_playerTorsoSize(0.5f, 0.7f, 0.3f);
-const glm::vec3 g_playerLimbSize(0.15f, 0.5f, 0.15f);
+const glm::vec3 g_playerLimbSize(0.15f, 0.35f, 0.15f);
 const float g_playerHeadRadius = 0.2f;
 const glm::vec3 g_keeperTorsoSize(0.5f, 0.7f, 0.3f);
 const glm::vec3 g_keeperLimbSize(0.15f, 0.4f, 0.15f);
@@ -318,17 +318,15 @@ void drawCylinder(unsigned int shaderProgram, unsigned int cylinderVAO, int inde
     glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, 0);
 }
 
-// --- FUNÇÕES DE DESENHO (JOGADOR E GOLEIRO) ---
+
 // void drawPlayer(unsigned int shaderProgram, unsigned int cubeVAO, unsigned int sphereVAO, int sphereIndexCount, glm::vec3 position, Team team) {
 //     glm::mat4 baseTransform = glm::translate(glm::mat4(1.0f), position);
 //     glm::vec3 direction = g_ballPosition - position;
 //     float angleY = atan2(direction.x, direction.z);
 //     baseTransform = glm::rotate(baseTransform, angleY, glm::vec3(0.0f, 1.0f, 0.0f));
-
-//     // --- Cores e Animação ---
-//     glm::vec4 armColor;
-//     glm::vec4 shortsColor;
-
+//     glm::vec4 color1, color2;
+//     if (team == TEAM_1) { color1 = g_team1Color1; color2 = g_team1Color2; }
+//     else { color1 = g_team2Color1; color2 = g_team2Color2; }
 //     float runAngle = 0.0f; float kickAngle = 0.0f;
 //     if (g_gameState == STATE_RUNNING_UP) { runAngle = sin(g_animationTimer * 10.0f); }
 //     else if (g_gameState == STATE_KICKING) {
@@ -336,158 +334,105 @@ void drawCylinder(unsigned int shaderProgram, unsigned int cylinderVAO, int inde
 //         if(kickProgress < 0.66f) { kickAngle = glm::mix(0.0f, glm::radians(-90.0f), kickProgress / 0.66f); }
 //         else { kickAngle = glm::mix(glm::radians(-90.0f), glm::radians(30.0f), (kickProgress - 0.66f) / 0.34f); }
 //     }
-
-//     // --- Definição de Tamanhos ---
-//     glm::vec3 torsoSize = g_playerTorsoSize;
-//     glm::vec3 limbSize = g_playerLimbSize;
-//     float headRadius = g_playerHeadRadius;
-//     float jointRadius = g_playerJointRadius;
-//     glm::vec3 handSize = g_playerHandSize;
-//     glm::vec3 footSize = g_playerFootSize;
-
-//     // (3) Torso Cônico: Dividido em ombros (mais largo) e cintura (mais estreita)
-//     glm::vec3 shoulderSize = glm::vec3(torsoSize.x, torsoSize.y * 0.6f, torsoSize.z);
-//     glm::vec3 waistSize = glm::vec3(torsoSize.x * 0.7f, torsoSize.y * 0.4f, torsoSize.z * 0.9f);
-
-//     // Posições relativas ao centro (baseTransform)
-//     float shoulderY = torsoSize.y * 0.4f / 2.0f; // Centro da parte de cima
-//     float waistY = -torsoSize.y * 0.6f / 2.0f;   // Centro da parte de baixo
-//     glm::vec3 shoulderPos = glm::vec3(0.0f, shoulderY, 0.0f);
-//     glm::vec3 waistPos = glm::vec3(0.0f, waistY, 0.0f);
-
-//     // Pontos de conexão para membros
-//     float topOfTorso = shoulderY + shoulderSize.y / 2.0f;
-//     float bottomOfTorso = waistY - waistSize.y / 2.0f;
-//     float shoulderAttachY = topOfTorso * 0.8f; // Ponto de conexão do ombro
-
+//     glm::vec3 torsoSize = g_playerTorsoSize; glm::vec3 limbSize = g_playerLimbSize; float headRadius = g_playerHeadRadius;
+//     glm::vec3 neckSize(headRadius * 0.5f, 0.1f, headRadius * 0.5f);
+//     glm::vec3 handSize(limbSize.x * 0.8f, limbSize.x * 0.8f, limbSize.x * 0.8f);
+//     glm::vec3 footSize(limbSize.x * 1.1f, 0.15f, limbSize.z * 1.8f);
+//     int numStripes = 4; float stripeHeight = torsoSize.y / numStripes; glm::vec3 stripeSize = glm::vec3(torsoSize.x, stripeHeight, torsoSize.z);
 //     glBindVertexArray(cubeVAO);
-
-//     // --- (2) Tronco (Listras Verticais ou Sólido) ---
-//     if (team == TEAM_1) {
-//         armColor = g_team1Stripe1; // Braços pretos
-//         shortsColor = g_team1Shorts; // Calção preto
-
-//         int numStripes = 5; // 5 faixas verticais (B-W-B-W-B)
-        
-//         // Desenha Ombros (Listrado)
-//         float stripeWidthShoulder = shoulderSize.x / numStripes;
-//         glm::vec3 stripeSizeShoulder = glm::vec3(stripeWidthShoulder, shoulderSize.y, shoulderSize.z);
-//         for (int i = 0; i < numStripes; ++i) {
-//             float xOffset = -shoulderSize.x / 2.0f + stripeWidthShoulder / 2.0f + i * stripeWidthShoulder;
-//             glm::mat4 torsoModel = glm::scale(glm::translate(baseTransform, shoulderPos + glm::vec3(xOffset, 0.0f, 0.0f)), stripeSizeShoulder);
-//             glm::vec4 color = (i % 2 == 0) ? g_team1Stripe1 : g_team1Stripe2;
-//             drawCube(shaderProgram, torsoModel, color);
-//         }
-//         // Desenha Cintura (Listrado)
-//         float stripeWidthWaist = waistSize.x / numStripes;
-//         glm::vec3 stripeSizeWaist = glm::vec3(stripeWidthWaist, waistSize.y, waistSize.z);
-//         for (int i = 0; i < numStripes; ++i) {
-//             float xOffset = -waistSize.x / 2.0f + stripeWidthWaist / 2.0f + i * stripeWidthWaist;
-//             glm::mat4 torsoModel = glm::scale(glm::translate(baseTransform, waistPos + glm::vec3(xOffset, 0.0f, 0.0f)), stripeSizeWaist);
-//             glm::vec4 color = (i % 2 == 0) ? g_team1Stripe1 : g_team1Stripe2;
-//             drawCube(shaderProgram, torsoModel, color);
-//         }
+//     for (int i = 0; i < numStripes; ++i) {
+//         float yOffset = -torsoSize.y/2.0f + stripeHeight / 2.0f + i * stripeHeight;
+//         glm::mat4 torsoModel = glm::scale(glm::translate(baseTransform, glm::vec3(0.0f, yOffset, 0.0f)), stripeSize);
+//         glm::vec4 color = (i % 2 == 0) ? color1 : color2; drawCube(shaderProgram, torsoModel, color);
 //     }
-//     else { // TEAM_2
-//         armColor = g_team2Color; // Braços azuis
-//         shortsColor = g_team2Shorts; // Calção branco
-
-//         // Desenha Ombros (Sólido)
-//         drawCube(shaderProgram, glm::scale(glm::translate(baseTransform, shoulderPos), shoulderSize), g_team2Color);
-//         // Desenha Cintura (Sólido)
-//         drawCube(shaderProgram, glm::scale(glm::translate(baseTransform, waistPos), waistSize), g_team2Color);
-//     }
-
-
-//     // --- Cabeça e Pescoço ---
-//     glm::mat4 neckJointModel = glm::translate(baseTransform, glm::vec3(0.0f, topOfTorso, 0.0f));
-//     drawSphere(shaderProgram, sphereVAO, sphereIndexCount, glm::scale(neckJointModel, glm::vec3(jointRadius * 1.5f)), g_skinColor);
-
-//     glm::mat4 headModel = glm::scale(glm::translate(neckJointModel, glm::vec3(0.0f, jointRadius * 1.5f + headRadius * 0.8f, 0.0f)), glm::vec3(headRadius));
+//     glm::mat4 neckModel_base = glm::translate(baseTransform, glm::vec3(0.0f, torsoSize.y / 2.0f, 0.0f));
+//     glm::mat4 neckModel_final = glm::scale(glm::translate(neckModel_base, glm::vec3(0.0f, neckSize.y / 2.0f, 0.0f)), neckSize);
+//     drawCube(shaderProgram, neckModel_final, g_skinColor);
+//     glm::mat4 headModel = glm::scale(glm::translate(neckModel_base, glm::vec3(0.0f, neckSize.y + headRadius * 0.8f, 0.0f)), glm::vec3(headRadius));
 //     drawSphere(shaderProgram, sphereVAO, sphereIndexCount, headModel, g_skinColor);
-
-
-//     // --- (1) Pernas (Hierarquia Corrigida) ---
-    
-//     // Perna Esquerda
-//     glm::mat4 coxaEsqModel_base = glm::translate(baseTransform, glm::vec3(-waistSize.x/2.5f, bottomOfTorso, 0.0f)); // Ponto do quadril
+//     glBindVertexArray(cubeVAO);
+//     glm::mat4 coxaEsqModel_base = glm::translate(baseTransform, glm::vec3(-0.15f, -torsoSize.y/2.0f, 0.0f));
 //     coxaEsqModel_base = glm::rotate(coxaEsqModel_base, glm::radians(30.0f) * -runAngle, glm::vec3(1.0f, 0.0f, 0.0f));
-//     drawSphere(shaderProgram, sphereVAO, sphereIndexCount, glm::scale(coxaEsqModel_base, glm::vec3(jointRadius)), shortsColor); // Articulação
 //     glm::mat4 coxaEsqModel_final = glm::scale(glm::translate(coxaEsqModel_base, glm::vec3(0.0f, -limbSize.y/2.0f, 0.0f)), limbSize);
-//     drawCube(shaderProgram, coxaEsqModel_final, shortsColor); // Coxa
-    
-//     glm::mat4 canelaEsqModel_base = glm::translate(coxaEsqModel_base, glm::vec3(0.0f, -limbSize.y, 0.0f)); // Ponto do joelho
+//     drawCube(shaderProgram, coxaEsqModel_final, g_shortsColor);
+//     glm::mat4 canelaEsqModel_base = glm::translate(coxaEsqModel_base, glm::vec3(0.0f, -limbSize.y, 0.0f));
 //     canelaEsqModel_base = glm::rotate(canelaEsqModel_base, glm::radians(20.0f) * std::max(0.0f, -runAngle), glm::vec3(1.0f, 0.0f, 0.0f));
-//     drawSphere(shaderProgram, sphereVAO, sphereIndexCount, glm::scale(canelaEsqModel_base, glm::vec3(jointRadius)), shortsColor); // Articulação
 //     glm::mat4 canelaEsqModel_final = glm::scale(glm::translate(canelaEsqModel_base, glm::vec3(0.0f, -limbSize.y/2.0f, 0.0f)), limbSize);
-//     drawCube(shaderProgram, canelaEsqModel_final, shortsColor); // Canela
-
+//     drawCube(shaderProgram, canelaEsqModel_final, g_shortsColor);
 //     glm::mat4 peEsqModel_base = glm::translate(canelaEsqModel_base, glm::vec3(0.0f, -limbSize.y, 0.0f)); // Ponto do tornozelo
 //     glm::mat4 peEsqModel_final = glm::scale(glm::translate(peEsqModel_base, glm::vec3(0.0f, -footSize.y / 2.0f, footSize.z / 3.0f)), footSize);
-//     drawCube(shaderProgram, peEsqModel_final, glm::vec4(0.9f, 0.9f, 0.9f, 1.0f)); // Chuteira
-
-//     // Perna Direita
-//     glm::mat4 coxaDirModel_base = glm::translate(baseTransform, glm::vec3(waistSize.x/2.5f, bottomOfTorso, 0.0f)); // Ponto do quadril
+//     drawCube(shaderProgram, peEsqModel_final, glm::vec4(0.9f, 0.9f, 0.9f, 1.0f)); // Chuteira Branca
+//     glm::mat4 coxaDirModel_base = glm::translate(baseTransform, glm::vec3(0.15f, -torsoSize.y/2.0f, 0.0f));
 //     float legAngle = (g_gameState == STATE_KICKING) ? kickAngle : (glm::radians(30.0f) * runAngle);
 //     coxaDirModel_base = glm::rotate(coxaDirModel_base, legAngle, glm::vec3(1.0f, 0.0f, 0.0f));
-//     drawSphere(shaderProgram, sphereVAO, sphereIndexCount, glm::scale(coxaDirModel_base, glm::vec3(jointRadius)), shortsColor); // Articulação
 //     glm::mat4 coxaDirModel_final = glm::scale(glm::translate(coxaDirModel_base, glm::vec3(0.0f, -limbSize.y/2.0f, 0.0f)), limbSize);
-//     drawCube(shaderProgram, coxaDirModel_final, shortsColor); // Coxa
-
-//     glm::mat4 canelaDirModel_base = glm::translate(coxaDirModel_base, glm::vec3(0.0f, -limbSize.y, 0.0f)); // Ponto do joelho
+//     drawCube(shaderProgram, coxaDirModel_final, g_shortsColor);
+//     glm::mat4 canelaDirModel_base = glm::translate(coxaDirModel_base, glm::vec3(0.0f, -limbSize.y, 0.0f));
 //     float kneeAngle = (g_gameState == STATE_KICKING) ? std::max(0.0f, -kickAngle * 0.5f) : (glm::radians(20.0f) * std::max(0.0f, runAngle));
 //     canelaDirModel_base = glm::rotate(canelaDirModel_base, kneeAngle, glm::vec3(1.0f, 0.0f, 0.0f));
-//     drawSphere(shaderProgram, sphereVAO, sphereIndexCount, glm::scale(canelaDirModel_base, glm::vec3(jointRadius)), shortsColor); // Articulação
 //     glm::mat4 canelaDirModel_final = glm::scale(glm::translate(canelaDirModel_base, glm::vec3(0.0f, -limbSize.y/2.0f, 0.0f)), limbSize);
-//     drawCube(shaderProgram, canelaDirModel_final, shortsColor); // Canela
-
-//     glm::mat4 peDirModel_base = glm::translate(canelaDirModel_base, glm::vec3(0.0f, -limbSize.y, 0.0f)); // Ponto do tornozelo
+//     drawCube(shaderProgram, canelaDirModel_final, g_shortsColor);
+//     glm::mat4 peDirModel_base = glm::translate(canelaDirModel_base, glm::vec3(0.0f, -limbSize.y, 0.0f));
 //     glm::mat4 peDirModel_final = glm::scale(glm::translate(peDirModel_base, glm::vec3(0.0f, -footSize.y / 2.0f, footSize.z / 3.0f)), footSize);
-//     drawCube(shaderProgram, peDirModel_final, glm::vec4(0.9f, 0.9f, 0.9f, 1.0f)); // Chuteira
-
-//     // --- Braços ---
-//     // Braço Esquerdo
-//     glm::mat4 bracoEsqModel_base = glm::translate(baseTransform, glm::vec3(-shoulderSize.x/2.0f, shoulderAttachY, 0.0f));
+//     drawCube(shaderProgram, peDirModel_final, glm::vec4(0.9f, 0.9f, 0.9f, 1.0f)); // Chuteira Branca
+//     glm::mat4 bracoEsqModel_base = glm::translate(baseTransform, glm::vec3(-torsoSize.x/2.0f, torsoSize.y * 0.4f, 0.0f));
 //     bracoEsqModel_base = glm::rotate(bracoEsqModel_base, glm::radians(30.0f) * runAngle, glm::vec3(1.0f, 0.0f, 0.0f));
-//     drawSphere(shaderProgram, sphereVAO, sphereIndexCount, glm::scale(bracoEsqModel_base, glm::vec3(jointRadius)), armColor; // Ombro
 //     glm::mat4 bracoEsqModel_final = glm::scale(glm::translate(bracoEsqModel_base, glm::vec3(-limbSize.x/2.0f, -limbSize.y/2.0f, 0.0f)), limbSize);
-//     drawCube(shaderProgram, bracoEsqModel_final, armColor); // Braço
-    
+//     drawCube(shaderProgram, bracoEsqModel_final, color1);
 //     glm::mat4 maoEsqModel_base = glm::translate(bracoEsqModel_base, glm::vec3(-limbSize.x/2.0f, -limbSize.y, 0.0f));
-//     glm::mat4 maoEsqModel_final = glm::scale(maoEsqModel_base, handSize);
-//     drawSphere(shaderProgram, sphereVAO, sphereIndexCount, maoEsqModel_final, g_skinColor); // Mão
-
-//     // Braço Direito
-//     glm::mat4 bracoDirModel_base = glm::translate(baseTransform, glm::vec3(shoulderSize.x/2.0f, shoulderAttachY, 0.0f));
+//     glm::mat4 maoEsqModel_final = glm::scale(glm::translate(maoEsqModel_base, glm::vec3(0.0f, -handSize.y/2.0f, 0.0f)), handSize);
+//     drawCube(shaderProgram, maoEsqModel_final, g_skinColor);
+//     glm::mat4 bracoDirModel_base = glm::translate(baseTransform, glm::vec3(torsoSize.x/2.0f, torsoSize.y * 0.4f, 0.0f));
 //     bracoDirModel_base = glm::rotate(bracoDirModel_base, glm::radians(30.0f) * -runAngle, glm::vec3(1.0f, 0.0f, 0.0f));
-//     drawSphere(shaderProgram, sphereVAO, sphereIndexCount, glm::scale(bracoDirModel_base, glm::vec3(jointRadius)), armColor; // Ombro
 //     glm::mat4 bracoDirModel_final = glm::scale(glm::translate(bracoDirModel_base, glm::vec3(limbSize.x/2.0f, -limbSize.y/2.0f, 0.0f)), limbSize);
-//     drawCube(shaderProgram, bracoDirModel_final, armColor); // Braço
-    
+//     drawCube(shaderProgram, bracoDirModel_final, color1);
 //     glm::mat4 maoDirModel_base = glm::translate(bracoDirModel_base, glm::vec3(limbSize.x/2.0f, -limbSize.y, 0.0f));
-//     glm::mat4 maoDirModel_final = glm::scale(maoDirModel_base, handSize);
-//     drawSphere(shaderProgram, sphereVAO, sphereIndexCount, maoDirModel_final, g_skinColor); // Mão
+//     glm::mat4 maoDirModel_final = glm::scale(glm::translate(maoDirModel_base, glm::vec3(0.0f, -handSize.y/2.0f, 0.0f)), handSize);
+//     drawCube(shaderProgram, maoDirModel_final, g_skinColor);
 // }
+
 void drawPlayer(unsigned int shaderProgram, unsigned int cubeVAO, unsigned int sphereVAO, int sphereIndexCount, glm::vec3 position, Team team) {
     glm::mat4 baseTransform = glm::translate(glm::mat4(1.0f), position);
     glm::vec3 direction = g_ballPosition - position;
     float angleY = atan2(direction.x, direction.z);
     baseTransform = glm::rotate(baseTransform, angleY, glm::vec3(0.0f, 1.0f, 0.0f));
+
     glm::vec4 color1, color2;
     if (team == TEAM_1) { color1 = g_team1Color1; color2 = g_team1Color2; }
     else { color1 = g_team2Color1; color2 = g_team2Color2; }
-    float runAngle = 0.0f; float kickAngle = 0.0f;
-    if (g_gameState == STATE_RUNNING_UP) { runAngle = sin(g_animationTimer * 10.0f); }
+
+    // --- (NOVO) Lógica de Animação Atualizada ---
+    float runAngle = 0.0f;
+    float kickAngle = 0.0f;
+    float jumpOffset = 0.0f;     // Para o pulo da comemoração
+    float armRaiseAngle = 0.0f;  // Para levantar os braços
+
+    if (g_gameState == STATE_RUNNING_UP) { 
+        runAngle = sin(g_animationTimer * 10.0f); 
+    }
     else if (g_gameState == STATE_KICKING) {
         float kickProgress = std::min(1.0f, g_animationTimer / 0.3f);
         if(kickProgress < 0.66f) { kickAngle = glm::mix(0.0f, glm::radians(-90.0f), kickProgress / 0.66f); }
         else { kickAngle = glm::mix(glm::radians(-90.0f), glm::radians(30.0f), (kickProgress - 0.66f) / 0.34f); }
     }
+    else if (g_gameState == STATE_CELEBRATING) {
+        // Pulo: abs(sin(...)) cria um movimento de "pulo" contínuo
+        jumpOffset = abs(sin(g_animationTimer * 8.0f)) * 0.4f; 
+        // Braços para cima: Gira -135 graus no eixo X
+        armRaiseAngle = glm::radians(-135.0f); 
+    }
+    // --- Fim da Lógica de Animação ---
+
+    // Aplica o pulo (se estiver comemorando)
+    baseTransform = glm::translate(baseTransform, glm::vec3(0.0f, jumpOffset, 0.0f));
+
+    // --- Desenho do Corpo (semelhante ao anterior) ---
     glm::vec3 torsoSize = g_playerTorsoSize; glm::vec3 limbSize = g_playerLimbSize; float headRadius = g_playerHeadRadius;
     glm::vec3 neckSize(headRadius * 0.5f, 0.1f, headRadius * 0.5f);
     glm::vec3 handSize(limbSize.x * 0.8f, limbSize.x * 0.8f, limbSize.x * 0.8f);
     glm::vec3 footSize(limbSize.x * 1.1f, 0.15f, limbSize.z * 1.8f);
     int numStripes = 4; float stripeHeight = torsoSize.y / numStripes; glm::vec3 stripeSize = glm::vec3(torsoSize.x, stripeHeight, torsoSize.z);
+    
     glBindVertexArray(cubeVAO);
     for (int i = 0; i < numStripes; ++i) {
         float yOffset = -torsoSize.y/2.0f + stripeHeight / 2.0f + i * stripeHeight;
@@ -497,25 +442,32 @@ void drawPlayer(unsigned int shaderProgram, unsigned int cubeVAO, unsigned int s
     glm::mat4 neckModel_base = glm::translate(baseTransform, glm::vec3(0.0f, torsoSize.y / 2.0f, 0.0f));
     glm::mat4 neckModel_final = glm::scale(glm::translate(neckModel_base, glm::vec3(0.0f, neckSize.y / 2.0f, 0.0f)), neckSize);
     drawCube(shaderProgram, neckModel_final, g_skinColor);
+    
     glm::mat4 headModel = glm::scale(glm::translate(neckModel_base, glm::vec3(0.0f, neckSize.y + headRadius * 0.8f, 0.0f)), glm::vec3(headRadius));
     drawSphere(shaderProgram, sphereVAO, sphereIndexCount, headModel, g_skinColor);
+    
     glBindVertexArray(cubeVAO);
     glm::mat4 coxaEsqModel_base = glm::translate(baseTransform, glm::vec3(-0.15f, -torsoSize.y/2.0f, 0.0f));
     coxaEsqModel_base = glm::rotate(coxaEsqModel_base, glm::radians(30.0f) * -runAngle, glm::vec3(1.0f, 0.0f, 0.0f));
     glm::mat4 coxaEsqModel_final = glm::scale(glm::translate(coxaEsqModel_base, glm::vec3(0.0f, -limbSize.y/2.0f, 0.0f)), limbSize);
     drawCube(shaderProgram, coxaEsqModel_final, g_shortsColor);
+    
+    // ... (código da canela e pé esquerdo) ...
     glm::mat4 canelaEsqModel_base = glm::translate(coxaEsqModel_base, glm::vec3(0.0f, -limbSize.y, 0.0f));
     canelaEsqModel_base = glm::rotate(canelaEsqModel_base, glm::radians(20.0f) * std::max(0.0f, -runAngle), glm::vec3(1.0f, 0.0f, 0.0f));
     glm::mat4 canelaEsqModel_final = glm::scale(glm::translate(canelaEsqModel_base, glm::vec3(0.0f, -limbSize.y/2.0f, 0.0f)), limbSize);
     drawCube(shaderProgram, canelaEsqModel_final, g_shortsColor);
-    glm::mat4 peEsqModel_base = glm::translate(canelaEsqModel_base, glm::vec3(0.0f, -limbSize.y, 0.0f)); // Ponto do tornozelo
+    glm::mat4 peEsqModel_base = glm::translate(canelaEsqModel_base, glm::vec3(0.0f, -limbSize.y, 0.0f)); 
     glm::mat4 peEsqModel_final = glm::scale(glm::translate(peEsqModel_base, glm::vec3(0.0f, -footSize.y / 2.0f, footSize.z / 3.0f)), footSize);
-    drawCube(shaderProgram, peEsqModel_final, glm::vec4(0.9f, 0.9f, 0.9f, 1.0f)); // Chuteira Branca
+    drawCube(shaderProgram, peEsqModel_final, glm::vec4(0.9f, 0.9f, 0.9f, 1.0f)); 
+
     glm::mat4 coxaDirModel_base = glm::translate(baseTransform, glm::vec3(0.15f, -torsoSize.y/2.0f, 0.0f));
     float legAngle = (g_gameState == STATE_KICKING) ? kickAngle : (glm::radians(30.0f) * runAngle);
     coxaDirModel_base = glm::rotate(coxaDirModel_base, legAngle, glm::vec3(1.0f, 0.0f, 0.0f));
     glm::mat4 coxaDirModel_final = glm::scale(glm::translate(coxaDirModel_base, glm::vec3(0.0f, -limbSize.y/2.0f, 0.0f)), limbSize);
     drawCube(shaderProgram, coxaDirModel_final, g_shortsColor);
+
+    // ... (código da canela e pé direito) ...
     glm::mat4 canelaDirModel_base = glm::translate(coxaDirModel_base, glm::vec3(0.0f, -limbSize.y, 0.0f));
     float kneeAngle = (g_gameState == STATE_KICKING) ? std::max(0.0f, -kickAngle * 0.5f) : (glm::radians(20.0f) * std::max(0.0f, runAngle));
     canelaDirModel_base = glm::rotate(canelaDirModel_base, kneeAngle, glm::vec3(1.0f, 0.0f, 0.0f));
@@ -523,18 +475,27 @@ void drawPlayer(unsigned int shaderProgram, unsigned int cubeVAO, unsigned int s
     drawCube(shaderProgram, canelaDirModel_final, g_shortsColor);
     glm::mat4 peDirModel_base = glm::translate(canelaDirModel_base, glm::vec3(0.0f, -limbSize.y, 0.0f));
     glm::mat4 peDirModel_final = glm::scale(glm::translate(peDirModel_base, glm::vec3(0.0f, -footSize.y / 2.0f, footSize.z / 3.0f)), footSize);
-    drawCube(shaderProgram, peDirModel_final, glm::vec4(0.9f, 0.9f, 0.9f, 1.0f)); // Chuteira Branca
+    drawCube(shaderProgram, peDirModel_final, glm::vec4(0.9f, 0.9f, 0.9f, 1.0f));
+
+    // --- (ATUALIZADO) Braços ---
     glm::mat4 bracoEsqModel_base = glm::translate(baseTransform, glm::vec3(-torsoSize.x/2.0f, torsoSize.y * 0.4f, 0.0f));
+    bracoEsqModel_base = glm::rotate(bracoEsqModel_base, armRaiseAngle, glm::vec3(1.0f, 0.0f, 0.0f)); // <-- Aplicando rotação da comemoração
     bracoEsqModel_base = glm::rotate(bracoEsqModel_base, glm::radians(30.0f) * runAngle, glm::vec3(1.0f, 0.0f, 0.0f));
     glm::mat4 bracoEsqModel_final = glm::scale(glm::translate(bracoEsqModel_base, glm::vec3(-limbSize.x/2.0f, -limbSize.y/2.0f, 0.0f)), limbSize);
     drawCube(shaderProgram, bracoEsqModel_final, color1);
+    
+    // ... (mão esquerda) ...
     glm::mat4 maoEsqModel_base = glm::translate(bracoEsqModel_base, glm::vec3(-limbSize.x/2.0f, -limbSize.y, 0.0f));
     glm::mat4 maoEsqModel_final = glm::scale(glm::translate(maoEsqModel_base, glm::vec3(0.0f, -handSize.y/2.0f, 0.0f)), handSize);
     drawCube(shaderProgram, maoEsqModel_final, g_skinColor);
+
     glm::mat4 bracoDirModel_base = glm::translate(baseTransform, glm::vec3(torsoSize.x/2.0f, torsoSize.y * 0.4f, 0.0f));
+    bracoDirModel_base = glm::rotate(bracoDirModel_base, armRaiseAngle, glm::vec3(1.0f, 0.0f, 0.0f)); // <-- Aplicando rotação da comemoração
     bracoDirModel_base = glm::rotate(bracoDirModel_base, glm::radians(30.0f) * -runAngle, glm::vec3(1.0f, 0.0f, 0.0f));
     glm::mat4 bracoDirModel_final = glm::scale(glm::translate(bracoDirModel_base, glm::vec3(limbSize.x/2.0f, -limbSize.y/2.0f, 0.0f)), limbSize);
     drawCube(shaderProgram, bracoDirModel_final, color1);
+
+    // ... (mão direita) ...
     glm::mat4 maoDirModel_base = glm::translate(bracoDirModel_base, glm::vec3(limbSize.x/2.0f, -limbSize.y, 0.0f));
     glm::mat4 maoDirModel_final = glm::scale(glm::translate(maoDirModel_base, glm::vec3(0.0f, -handSize.y/2.0f, 0.0f)), handSize);
     drawCube(shaderProgram, maoDirModel_final, g_skinColor);
@@ -732,6 +693,122 @@ void drawGoal(unsigned int shaderProgram, unsigned int cubeVAO, unsigned int cyl
     glBindVertexArray(0); // Unbind VAO after drawing everything for this goal
 }
 
+// void drawCrowd(unsigned int shaderProgram, unsigned int cubeVAO, unsigned int sphereVAO, int sphereIndexCount) {
+    
+//     // --- O "Truque" ---
+//     // Salva o estado atual e força um estado ocioso (parado)
+//     // para que a torcida não comece a correr ou chutar junto com o jogador.
+//     GameState originalState = g_gameState;
+//     g_gameState = STATE_READY;
+
+//     // --- Parâmetros (baseados em drawGrandstands) ---
+//     int numSteps = 4;           // N. de degraus
+//     float stepWidth = 1.0f;
+//     float stepHeight = 0.5f;
+//     float fieldEdgeX = 10.0f;   // Metade da largura do campo
+//     float fieldLength = 25.0f;  // Comprimento total do campo
+    
+//     float spacingZ = 2.0f; // Espaço entre cada torcedor no eixo Z
+//     int spectatorsPerRow = (int)(fieldLength / spacingZ);
+
+//     // Loop pelas fileiras (degraus)
+//     for (int i = 0; i < numSteps; ++i) {
+        
+//         // Posição Y do "chão" do degrau onde o torcedor ficará
+//         // (Centro do degrau + metade da altura do degrau)
+//         float yPos = ((stepHeight / 2.0f) + (i * stepHeight)) + (stepHeight / 2.0f);
+        
+//         // Posição X do centro do degrau (Lado Esquerdo)
+//         float xPosLeft = -fieldEdgeX - (stepWidth / 2.0f) - (i * stepWidth);
+        
+//         // Posição X do centro do degrau (Lado Direito)
+//         float xPosRight = fieldEdgeX + (stepWidth / 2.0f) + (i * stepWidth);
+
+//         // Loop pelos "assentos" (ao longo do eixo Z)
+//         for (int j = 0; j < spectatorsPerRow; ++j) {
+            
+//             // Calcula a posição Z de cada torcedor
+//             // Começa no fundo (-12.5) e avança
+//             float zPos = -(fieldLength / 2.0f) + (spacingZ / 2.0f) + (j * spacingZ);
+            
+//             // --- Desenha Torcedor da Esquerda (Time 1 - Preto) ---
+//             glm::vec3 posLeft(xPosLeft, yPos, zPos);
+//             // Usamos TEAM_1 para a cor preta/branca
+//             drawPlayer(shaderProgram, cubeVAO, sphereVAO, sphereIndexCount, posLeft, TEAM_1);
+            
+//             // --- Desenha Torcedor da Direita (Time 2 - Azul) ---
+//             glm::vec3 posRight(xPosRight, yPos, zPos);
+//             // Usamos TEAM_2 para a cor azul
+//             drawPlayer(shaderProgram, cubeVAO, sphereVAO, sphereIndexCount, posRight, TEAM_2);
+//         }
+//     }
+    
+//     // Restaura o estado original do jogo
+//     g_gameState = originalState;
+// }
+
+/**
+ * (ATUALIZADO) Desenha a torcida, com lógica de comemoração
+ */
+void drawCrowd(unsigned int shaderProgram, unsigned int cubeVAO, unsigned int sphereVAO, int sphereIndexCount) {
+    
+    // Salva o estado ATUAL do jogo
+    GameState realGameState = g_gameState;
+    // Pega o time que chutou (se for gol, é o time que comemora)
+    Team teamThatScored = g_currentKicker; 
+
+    // --- Parâmetros (baseados em drawGrandstands) ---
+    int numSteps = 4;           // N. de degraus
+    float stepWidth = 1.0f;
+    float stepHeight = 0.5f;
+    float fieldEdgeX = 10.0f;   // Metade da largura do campo
+    float fieldLength = 25.0f;  // Comprimento total do campo
+    
+    float spacingZ = 2.0f; // Espaço entre cada torcedor no eixo Z
+    int spectatorsPerRow = (int)(fieldLength / spacingZ);
+
+    // Loop pelas fileiras (degraus)
+    for (int i = 0; i < numSteps; ++i) {
+        
+        float yPos = ((stepHeight / 2.0f) + (i * stepHeight)) + (stepHeight / 2.0f);
+        float xPosLeft = -fieldEdgeX - (stepWidth / 2.0f) - (i * stepWidth);
+        float xPosRight = fieldEdgeX + (stepWidth / 2.0f) + (i * stepWidth);
+
+        // Loop pelos "assentos" (ao longo do eixo Z)
+        for (int j = 0; j < spectatorsPerRow; ++j) {
+            
+            float zPos = -(fieldLength / 2.0f) + (spacingZ / 2.0f) + (j * spacingZ);
+            
+            // --- Desenha Torcedor da Esquerda (Time 1 - Preto) ---
+            
+            // Lógica de Animação:
+            // Se o estado real é GOAL e o Time 1 marcou, comemore!
+            if (realGameState == STATE_GOAL && teamThatScored == TEAM_1) {
+                g_gameState = STATE_CELEBRATING; // Ativa a comemoração
+            } else {
+                g_gameState = STATE_READY; // Senão, fique parado
+            }
+            glm::vec3 posLeft(xPosLeft, yPos, zPos);
+            drawPlayer(shaderProgram, cubeVAO, sphereVAO, sphereIndexCount, posLeft, TEAM_1);
+            
+            // --- Desenha Torcedor da Direita (Time 2 - Azul) ---
+            
+            // Lógica de Animação:
+            // Se o estado real é GOAL e o Time 2 marcou, comemore!
+            if (realGameState == STATE_GOAL && teamThatScored == TEAM_2) {
+                g_gameState = STATE_CELEBRATING; // Ativa a comemoração
+            } else {
+                g_gameState = STATE_READY; // Senão, fique parado
+            }
+            glm::vec3 posRight(xPosRight, yPos, zPos);
+            drawPlayer(shaderProgram, cubeVAO, sphereVAO, sphereIndexCount, posRight, TEAM_2);
+        }
+    }
+    
+    // Restaura o estado real do jogo (MUITO IMPORTANTE)
+    g_gameState = realGameState;
+}
+
 void drawGrandstands(unsigned int shaderProgram, unsigned int cubeVAO) {
     glm::vec4 concreteColor(0.5f, 0.5f, 0.5f, 1.0f); // Cor de concreto
     
@@ -907,7 +984,7 @@ int main() {
         // (if (g_gameState != STATE_GAMEOVER)...)
         // (etc...)
         if (g_netAnimationTimer > 0.0f) { g_netAnimationTimer -= deltaTime; }
-        if (g_gameState == STATE_RUNNING_UP || g_gameState == STATE_KICKING || g_keeperState == KEEPER_DIVING) {
+        if (g_gameState == STATE_RUNNING_UP || g_gameState == STATE_KICKING || g_keeperState == KEEPER_DIVING || g_gameState == STATE_GOAL) {
             g_animationTimer += deltaTime;
         }
         if (g_gameState != STATE_GAMEOVER) {
@@ -1101,6 +1178,8 @@ int main() {
         // drawScoreboard(shaderProgram, cubeVAO);
         
         drawGrandstands(shaderProgram, cubeVAO); // <-- ADICIONE AQUI
+
+        drawCrowd(shaderProgram, cubeVAO, sphereVAO, sphereIndexCount);
         
         // Goleiro (Amarelo, com animação de mergulho)
         drawKeeper(shaderProgram, cubeVAO, sphereVAO, sphereIndexCount, g_keeperPosition, g_keeperColor);

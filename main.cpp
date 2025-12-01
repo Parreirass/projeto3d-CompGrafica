@@ -39,7 +39,7 @@ std::vector<int> g_team1Results = {0, 0, 0};
 std::vector<int> g_team2Results = {0, 0, 0};
 
 // --- Posições e Dimensões ---
-glm::vec3 g_playerStartPos(2.0f, 1.5f, 8.0f);
+glm::vec3 g_playerStartPos(2.0f, 1.1f, 8.0f);
 glm::vec3 g_playerPosition(g_playerStartPos);
 glm::vec3 g_ballPosition(0.0f, 0.1f, 6.0f);
 glm::vec3 g_keeperPosition(0.0f, 0.8f, -10.0f);
@@ -317,79 +317,6 @@ void drawCylinder(unsigned int shaderProgram, unsigned int cylinderVAO, int inde
     glBindVertexArray(cylinderVAO);
     glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, 0);
 }
-
-
-// void drawPlayer(unsigned int shaderProgram, unsigned int cubeVAO, unsigned int sphereVAO, int sphereIndexCount, glm::vec3 position, Team team) {
-//     glm::mat4 baseTransform = glm::translate(glm::mat4(1.0f), position);
-//     glm::vec3 direction = g_ballPosition - position;
-//     float angleY = atan2(direction.x, direction.z);
-//     baseTransform = glm::rotate(baseTransform, angleY, glm::vec3(0.0f, 1.0f, 0.0f));
-//     glm::vec4 color1, color2;
-//     if (team == TEAM_1) { color1 = g_team1Color1; color2 = g_team1Color2; }
-//     else { color1 = g_team2Color1; color2 = g_team2Color2; }
-//     float runAngle = 0.0f; float kickAngle = 0.0f;
-//     if (g_gameState == STATE_RUNNING_UP) { runAngle = sin(g_animationTimer * 10.0f); }
-//     else if (g_gameState == STATE_KICKING) {
-//         float kickProgress = std::min(1.0f, g_animationTimer / 0.3f);
-//         if(kickProgress < 0.66f) { kickAngle = glm::mix(0.0f, glm::radians(-90.0f), kickProgress / 0.66f); }
-//         else { kickAngle = glm::mix(glm::radians(-90.0f), glm::radians(30.0f), (kickProgress - 0.66f) / 0.34f); }
-//     }
-//     glm::vec3 torsoSize = g_playerTorsoSize; glm::vec3 limbSize = g_playerLimbSize; float headRadius = g_playerHeadRadius;
-//     glm::vec3 neckSize(headRadius * 0.5f, 0.1f, headRadius * 0.5f);
-//     glm::vec3 handSize(limbSize.x * 0.8f, limbSize.x * 0.8f, limbSize.x * 0.8f);
-//     glm::vec3 footSize(limbSize.x * 1.1f, 0.15f, limbSize.z * 1.8f);
-//     int numStripes = 4; float stripeHeight = torsoSize.y / numStripes; glm::vec3 stripeSize = glm::vec3(torsoSize.x, stripeHeight, torsoSize.z);
-//     glBindVertexArray(cubeVAO);
-//     for (int i = 0; i < numStripes; ++i) {
-//         float yOffset = -torsoSize.y/2.0f + stripeHeight / 2.0f + i * stripeHeight;
-//         glm::mat4 torsoModel = glm::scale(glm::translate(baseTransform, glm::vec3(0.0f, yOffset, 0.0f)), stripeSize);
-//         glm::vec4 color = (i % 2 == 0) ? color1 : color2; drawCube(shaderProgram, torsoModel, color);
-//     }
-//     glm::mat4 neckModel_base = glm::translate(baseTransform, glm::vec3(0.0f, torsoSize.y / 2.0f, 0.0f));
-//     glm::mat4 neckModel_final = glm::scale(glm::translate(neckModel_base, glm::vec3(0.0f, neckSize.y / 2.0f, 0.0f)), neckSize);
-//     drawCube(shaderProgram, neckModel_final, g_skinColor);
-//     glm::mat4 headModel = glm::scale(glm::translate(neckModel_base, glm::vec3(0.0f, neckSize.y + headRadius * 0.8f, 0.0f)), glm::vec3(headRadius));
-//     drawSphere(shaderProgram, sphereVAO, sphereIndexCount, headModel, g_skinColor);
-//     glBindVertexArray(cubeVAO);
-//     glm::mat4 coxaEsqModel_base = glm::translate(baseTransform, glm::vec3(-0.15f, -torsoSize.y/2.0f, 0.0f));
-//     coxaEsqModel_base = glm::rotate(coxaEsqModel_base, glm::radians(30.0f) * -runAngle, glm::vec3(1.0f, 0.0f, 0.0f));
-//     glm::mat4 coxaEsqModel_final = glm::scale(glm::translate(coxaEsqModel_base, glm::vec3(0.0f, -limbSize.y/2.0f, 0.0f)), limbSize);
-//     drawCube(shaderProgram, coxaEsqModel_final, g_shortsColor);
-//     glm::mat4 canelaEsqModel_base = glm::translate(coxaEsqModel_base, glm::vec3(0.0f, -limbSize.y, 0.0f));
-//     canelaEsqModel_base = glm::rotate(canelaEsqModel_base, glm::radians(20.0f) * std::max(0.0f, -runAngle), glm::vec3(1.0f, 0.0f, 0.0f));
-//     glm::mat4 canelaEsqModel_final = glm::scale(glm::translate(canelaEsqModel_base, glm::vec3(0.0f, -limbSize.y/2.0f, 0.0f)), limbSize);
-//     drawCube(shaderProgram, canelaEsqModel_final, g_shortsColor);
-//     glm::mat4 peEsqModel_base = glm::translate(canelaEsqModel_base, glm::vec3(0.0f, -limbSize.y, 0.0f)); // Ponto do tornozelo
-//     glm::mat4 peEsqModel_final = glm::scale(glm::translate(peEsqModel_base, glm::vec3(0.0f, -footSize.y / 2.0f, footSize.z / 3.0f)), footSize);
-//     drawCube(shaderProgram, peEsqModel_final, glm::vec4(0.9f, 0.9f, 0.9f, 1.0f)); // Chuteira Branca
-//     glm::mat4 coxaDirModel_base = glm::translate(baseTransform, glm::vec3(0.15f, -torsoSize.y/2.0f, 0.0f));
-//     float legAngle = (g_gameState == STATE_KICKING) ? kickAngle : (glm::radians(30.0f) * runAngle);
-//     coxaDirModel_base = glm::rotate(coxaDirModel_base, legAngle, glm::vec3(1.0f, 0.0f, 0.0f));
-//     glm::mat4 coxaDirModel_final = glm::scale(glm::translate(coxaDirModel_base, glm::vec3(0.0f, -limbSize.y/2.0f, 0.0f)), limbSize);
-//     drawCube(shaderProgram, coxaDirModel_final, g_shortsColor);
-//     glm::mat4 canelaDirModel_base = glm::translate(coxaDirModel_base, glm::vec3(0.0f, -limbSize.y, 0.0f));
-//     float kneeAngle = (g_gameState == STATE_KICKING) ? std::max(0.0f, -kickAngle * 0.5f) : (glm::radians(20.0f) * std::max(0.0f, runAngle));
-//     canelaDirModel_base = glm::rotate(canelaDirModel_base, kneeAngle, glm::vec3(1.0f, 0.0f, 0.0f));
-//     glm::mat4 canelaDirModel_final = glm::scale(glm::translate(canelaDirModel_base, glm::vec3(0.0f, -limbSize.y/2.0f, 0.0f)), limbSize);
-//     drawCube(shaderProgram, canelaDirModel_final, g_shortsColor);
-//     glm::mat4 peDirModel_base = glm::translate(canelaDirModel_base, glm::vec3(0.0f, -limbSize.y, 0.0f));
-//     glm::mat4 peDirModel_final = glm::scale(glm::translate(peDirModel_base, glm::vec3(0.0f, -footSize.y / 2.0f, footSize.z / 3.0f)), footSize);
-//     drawCube(shaderProgram, peDirModel_final, glm::vec4(0.9f, 0.9f, 0.9f, 1.0f)); // Chuteira Branca
-//     glm::mat4 bracoEsqModel_base = glm::translate(baseTransform, glm::vec3(-torsoSize.x/2.0f, torsoSize.y * 0.4f, 0.0f));
-//     bracoEsqModel_base = glm::rotate(bracoEsqModel_base, glm::radians(30.0f) * runAngle, glm::vec3(1.0f, 0.0f, 0.0f));
-//     glm::mat4 bracoEsqModel_final = glm::scale(glm::translate(bracoEsqModel_base, glm::vec3(-limbSize.x/2.0f, -limbSize.y/2.0f, 0.0f)), limbSize);
-//     drawCube(shaderProgram, bracoEsqModel_final, color1);
-//     glm::mat4 maoEsqModel_base = glm::translate(bracoEsqModel_base, glm::vec3(-limbSize.x/2.0f, -limbSize.y, 0.0f));
-//     glm::mat4 maoEsqModel_final = glm::scale(glm::translate(maoEsqModel_base, glm::vec3(0.0f, -handSize.y/2.0f, 0.0f)), handSize);
-//     drawCube(shaderProgram, maoEsqModel_final, g_skinColor);
-//     glm::mat4 bracoDirModel_base = glm::translate(baseTransform, glm::vec3(torsoSize.x/2.0f, torsoSize.y * 0.4f, 0.0f));
-//     bracoDirModel_base = glm::rotate(bracoDirModel_base, glm::radians(30.0f) * -runAngle, glm::vec3(1.0f, 0.0f, 0.0f));
-//     glm::mat4 bracoDirModel_final = glm::scale(glm::translate(bracoDirModel_base, glm::vec3(limbSize.x/2.0f, -limbSize.y/2.0f, 0.0f)), limbSize);
-//     drawCube(shaderProgram, bracoDirModel_final, color1);
-//     glm::mat4 maoDirModel_base = glm::translate(bracoDirModel_base, glm::vec3(limbSize.x/2.0f, -limbSize.y, 0.0f));
-//     glm::mat4 maoDirModel_final = glm::scale(glm::translate(maoDirModel_base, glm::vec3(0.0f, -handSize.y/2.0f, 0.0f)), handSize);
-//     drawCube(shaderProgram, maoDirModel_final, g_skinColor);
-// }
 
 void drawPlayer(unsigned int shaderProgram, unsigned int cubeVAO, unsigned int sphereVAO, int sphereIndexCount, glm::vec3 position, Team team) {
     glm::mat4 baseTransform = glm::translate(glm::mat4(1.0f), position);
@@ -1066,7 +993,7 @@ int main() {
                             g_currentKick++;
                         }
                     }
-                    // (A LÓGICA DE 'if (g_goalRecorded)' FOI REMOVIDA DAQUI)
+                    
                 }
             }
             if (g_keeperState == KEEPER_DIVING) {

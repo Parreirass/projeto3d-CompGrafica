@@ -127,9 +127,7 @@ const char* lightingFragmentShader = "#version 330 core\n"
     "   FragColor = vec4(result, objectColor.a);\n"
     "}\n\0";
 
-/**
- * (NOVA) Calcula g_cameraPos e g_viewMatrix com base nos ângulos
- */
+
 void updateCamera() {
     // 1. Trava o ângulo vertical (pitch) para não virar de cabeça para baixo
     g_cameraPitch = glm::clamp(g_cameraPitch, glm::radians(5.0f), glm::radians(89.0f));
@@ -143,9 +141,7 @@ void updateCamera() {
     g_viewMatrix = glm::lookAt(g_cameraPos, g_cameraTarget, glm::vec3(0.0f, 1.0f, 0.0f));
 }
 
-/**
- * (NOVA) Processa input do teclado (setinhas)
- */
+
 void processInput(GLFWwindow* window) {
     float cameraSpeed = 0.03f; // Sensibilidade da rotação
 
@@ -163,9 +159,7 @@ void processInput(GLFWwindow* window) {
         g_cameraPitch -= cameraSpeed;
 }
 
-/**
- * (NOVA) Callback para o clique do mouse
- */
+
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
         if (action == GLFW_PRESS) {
@@ -177,9 +171,7 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
     }
 }
 
-/**
- * (NOVA) Callback para a posição do mouse (arrastar)
- */
+
 void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
     if (!g_isMouseDragging) return;
 
@@ -197,9 +189,7 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
     g_cameraPitch += yOffset;
 }
 
-/**
- * (NOVA) Callback para o scroll do mouse (zoom)
- */
+
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
     float zoomSpeed = 0.5f;
     g_cameraRadius -= yoffset * zoomSpeed;
@@ -294,7 +284,7 @@ std::pair<unsigned int, int> createCylinderVAO(float radius, float height, int s
     glBindVertexArray(0);
     return {VAO, (int)indices.size()};
 }
-// --- FIM GEOMETRIA ---
+
 
 
 // --- FUNÇÕES DE DESENHO BASE ---
@@ -328,7 +318,7 @@ void drawPlayer(unsigned int shaderProgram, unsigned int cubeVAO, unsigned int s
     if (team == TEAM_1) { color1 = g_team1Color1; color2 = g_team1Color2; }
     else { color1 = g_team2Color1; color2 = g_team2Color2; }
 
-    // --- (NOVO) Lógica de Animação Atualizada ---
+    // --- Lógica de Animação Atualizada ---
     float runAngle = 0.0f;
     float kickAngle = 0.0f;
     float jumpOffset = 0.0f;     // Para o pulo da comemoração
@@ -353,7 +343,7 @@ void drawPlayer(unsigned int shaderProgram, unsigned int cubeVAO, unsigned int s
     // Aplica o pulo (se estiver comemorando)
     baseTransform = glm::translate(baseTransform, glm::vec3(0.0f, jumpOffset, 0.0f));
 
-    // --- Desenho do Corpo (semelhante ao anterior) ---
+    // --- Desenho do Corpo ---
     glm::vec3 torsoSize = g_playerTorsoSize; glm::vec3 limbSize = g_playerLimbSize; float headRadius = g_playerHeadRadius;
     glm::vec3 neckSize(headRadius * 0.5f, 0.1f, headRadius * 0.5f);
     glm::vec3 handSize(limbSize.x * 0.8f, limbSize.x * 0.8f, limbSize.x * 0.8f);
@@ -548,7 +538,7 @@ void drawGoal(unsigned int shaderProgram, unsigned int cubeVAO, unsigned int cyl
     drawCylinder(shaderProgram, cylinderVAO, cylinderIndexCount, backRightPostModel, backPostHeight, postRadius * 0.8f, goalColor);
 
 
-    // --- Barras Diagonais Superiores (CORRIGIDO) ---
+    // --- Barras Diagonais Superiores 
     float diagonalRadius = postRadius * 0.7f;
     glm::vec3 yAxis(0.0f, 1.0f, 0.0f); // Default cylinder orientation
 
@@ -559,18 +549,16 @@ void drawGoal(unsigned int shaderProgram, unsigned int cubeVAO, unsigned int cyl
     float lengthLeft = glm::distance(startLeft, endLeft);
     glm::vec3 directionLeft = glm::normalize(endLeft - startLeft);
 
-    // Calculate rotation axis and angle
     glm::vec3 axisLeft = glm::cross(yAxis, directionLeft);
     float dotLeft = glm::dot(yAxis, directionLeft);
-    // Clamp dot product to avoid acos domain error
+
     dotLeft = std::max(-1.0f, std::min(1.0f, dotLeft));
     float angleLeft = glm::acos(dotLeft);
 
     glm::mat4 rotationLeft = glm::rotate(glm::mat4(1.0f), angleLeft, axisLeft);
     glm::mat4 scaleLeft = glm::scale(glm::mat4(1.0f), glm::vec3(diagonalRadius, lengthLeft, diagonalRadius)); // Scale applied last
     glm::mat4 diagLeftModel = glm::translate(glm::mat4(1.0f), centerLeft) * rotationLeft * scaleLeft;
-    // Pass the combined matrix to a simplified drawCylinder (or adjust drawCylinder)
-    // Assuming drawCylinder takes the full model matrix including scale:
+
     glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(diagLeftModel));
     glUniform4f(glGetUniformLocation(shaderProgram, "objectColor"), goalColor.r, goalColor.g, goalColor.b, goalColor.a);
     glBindVertexArray(cylinderVAO);
@@ -599,7 +587,7 @@ void drawGoal(unsigned int shaderProgram, unsigned int cubeVAO, unsigned int cyl
     // --- FIM Barras Diagonais ---
 
 
-    // --- Draw Net (Transparent Thin Cubes) ---
+    // --- Draw Net 
     glBindVertexArray(cubeVAO);
     float netThickness = 0.02f;
     // Back Net
@@ -617,7 +605,7 @@ void drawGoal(unsigned int shaderProgram, unsigned int cubeVAO, unsigned int cyl
     topNetModel = glm::rotate(topNetModel, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
     drawCube(shaderProgram, glm::scale(topNetModel, glm::vec3(g_goalWidth, netDepth, netThickness)), netColor);
 
-    glBindVertexArray(0); // Unbind VAO after drawing everything for this goal
+    glBindVertexArray(0); 
 }
 
 // void drawCrowd(unsigned int shaderProgram, unsigned int cubeVAO, unsigned int sphereVAO, int sphereIndexCount) {
@@ -674,9 +662,7 @@ void drawGoal(unsigned int shaderProgram, unsigned int cubeVAO, unsigned int cyl
 //     g_gameState = originalState;
 // }
 
-/**
- * (ATUALIZADO) Desenha a torcida, com lógica de comemoração
- */
+
 void drawCrowd(unsigned int shaderProgram, unsigned int cubeVAO, unsigned int sphereVAO, int sphereIndexCount) {
     
     // Salva o estado ATUAL do jogo
@@ -709,7 +695,7 @@ void drawCrowd(unsigned int shaderProgram, unsigned int cubeVAO, unsigned int sp
             // --- Desenha Torcedor da Esquerda (Time 1 - Preto) ---
             
             // Lógica de Animação:
-            // Se o estado real é GOAL e o Time 1 marcou, comemore!
+            // Se o estado real é GOAL e o Time 1 marcou
             if (realGameState == STATE_GOAL && teamThatScored == TEAM_1) {
                 g_gameState = STATE_CELEBRATING; // Ativa a comemoração
             } else {
@@ -721,7 +707,7 @@ void drawCrowd(unsigned int shaderProgram, unsigned int cubeVAO, unsigned int sp
             // --- Desenha Torcedor da Direita (Time 2 - Azul) ---
             
             // Lógica de Animação:
-            // Se o estado real é GOAL e o Time 2 marcou, comemore!
+            // Se o estado real é GOAL e o Time 2 marcou
             if (realGameState == STATE_GOAL && teamThatScored == TEAM_2) {
                 g_gameState = STATE_CELEBRATING; // Ativa a comemoração
             } else {
@@ -732,7 +718,7 @@ void drawCrowd(unsigned int shaderProgram, unsigned int cubeVAO, unsigned int sp
         }
     }
     
-    // Restaura o estado real do jogo (MUITO IMPORTANTE)
+    // Restaura o estado real do jogo
     g_gameState = realGameState;
 }
 
@@ -777,7 +763,6 @@ void drawGrandstands(unsigned int shaderProgram, unsigned int cubeVAO) {
         drawCube(shaderProgram, model, concreteColor);
     }
 
-    // --- (NOVO) Arquibancada Traseira (Z negativo, atrás do gol) ---
     // O comprimento (em X) da arquibancada traseira deve cobrir a largura do campo + as laterais da arquibancada
     float backStepLengthX = fieldWidth - 8 + (numSteps * stepWidth * 2.0f); // Largura do campo + larguras das arquibancadas laterais
     float backStepLengthZ = stepWidth; // A "largura" de cada degrau em Z
@@ -819,7 +804,6 @@ bool checkCollision(glm::vec3 pos1, glm::vec3 size1, glm::vec3 pos2, float radiu
     glm::vec3 closest;
     closest.x = std::max(pos1.x - half1.x, std::min(pos2.x, pos1.x + half1.x));
     closest.y = std::max(pos1.y - half1.y, std::min(pos2.y, pos1.y + half1.y));
-    // FIX: usar pos1.z (antes estava pos1.x erroneamente)
     closest.z = std::max(pos1.z - half1.z, std::min(pos2.z, pos1.z + half1.z));
     float distance = glm::length(closest - pos2);
     return distance < radius2;
@@ -891,7 +875,6 @@ int main() {
     glfwSetCursorPosCallback(window, cursor_position_callback);
     glfwSetScrollCallback(window, scroll_callback);
 
-    // Chame isso uma vez antes do loop para definir a posição inicial
     updateCamera();
     
     printKickMessage();
@@ -907,9 +890,7 @@ int main() {
         glfwPollEvents();
         
         // ... (TODA A SUA LÓGICA DE JOGO VEM AQUI) ...
-        // (if (g_netAnimationTimer > 0.0f)...)
-        // (if (g_gameState != STATE_GAMEOVER)...)
-        // (etc...)
+
         if (g_netAnimationTimer > 0.0f) { g_netAnimationTimer -= deltaTime; }
         if (g_gameState == STATE_RUNNING_UP || g_gameState == STATE_KICKING || g_keeperState == KEEPER_DIVING || g_gameState == STATE_GOAL) {
             g_animationTimer += deltaTime;
@@ -1011,10 +992,8 @@ int main() {
             }
             // 6. ESTADO DE GOL
             if (g_gameState == STATE_GOAL) {
-                // (NOVO!) ATUALIZA A FÍSICA DA BOLA PARA ELA CONTINUAR ATÉ A REDE
                 g_ballPosition += g_ballVelocity * deltaTime;
 
-                // (MOVIDO PARA CÁ!) VERIFICA COLISÃO COM A REDE TRASEIRA
                 // (A flag g_goalRecorded já é verdadeira se estamos neste estado)
                 if (g_ballPosition.z < (g_backNetZ + 0.05f)) {
                     // Trava a bola na rede
@@ -1029,7 +1008,6 @@ int main() {
                     g_resetTimer = 2.0f;
                 }
 
-                // (NOVO) VERIFICA SE A BOLA ESTÁ "SAINDO" DO GOL APÓS REBATER
                 // Só ativa se a bola estiver vindo para frente (vel Z > 0)
                 if (g_ballVelocity.z > 0 && g_ballPosition.z > (g_goalLineZ - 0.05f)) {
                     // Trava a bola na linha do gol
@@ -1078,7 +1056,6 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glUseProgram(shaderProgram);
 
-        // --- Bloco ÚNICO e CORRETO de Câmera ---
         // 1. Processa os inputs de teclado
         processInput(window);
 
@@ -1104,11 +1081,11 @@ int main() {
         // drawFieldMarkings(shaderProgram, cubeVAO);
         // drawScoreboard(shaderProgram, cubeVAO);
         
-        drawGrandstands(shaderProgram, cubeVAO); // <-- ADICIONE AQUI
+        drawGrandstands(shaderProgram, cubeVAO); // 
 
         drawCrowd(shaderProgram, cubeVAO, sphereVAO, sphereIndexCount);
         
-        // Goleiro (Amarelo, com animação de mergulho)
+        // Goleiro 
         drawKeeper(shaderProgram, cubeVAO, sphereVAO, sphereIndexCount, g_keeperPosition, g_keeperColor);
         
         // Desenha o jogador ATIVO (com animação de corrida/chute)
